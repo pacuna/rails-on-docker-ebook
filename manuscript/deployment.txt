@@ -10,7 +10,7 @@ We can create the cluster using one simple command. The only parameter
 that we need is the cluster name.
 
 {linenos=off}
-	aws ecs create-cluster --cluster-name "searchapp"
+	$ aws ecs create-cluster --cluster-name "searchapp"
 
 Output:
 
@@ -46,7 +46,7 @@ in our cluster. For launching the instances we'll need:
 Let's create our key pair:
 
 {linenos=off}
-	aws ec2 create-key-pair --key-name keys_cluster
+	$ aws ec2 create-key-pair --key-name keys_cluster
 
 Output:
 
@@ -72,55 +72,274 @@ Now set the permissions of the file:
 Now move the file to your ssh keys directory or some place safe. Remember
 that with just this file you'll be able to ssh into your cluster instances.
 
-Now, let's create the security group. The rules for this security group
-are going to restrict and allow access to our cluster instances.
-
-Some time ago Amazon released their VPC technology and now you'll probably
-have a default vpc. We're going to need the id of the vpc in order to create
-resources inside of if.
-
-The command for getting your default VPC attributes is:
+For the security groups for the instances, we can use our default security group
+for our default vpc. In order to get the information for our default vpc security
+group, you can run:
 
 {linenos=off}
-	aws ec2 describe-vpcs
+	$ aws ec2 describe-security-groups
 
 Output:
 
 {linenos=off}
 	{
-	    "Vpcs": [
+	    "SecurityGroups": [
 		{
+		    "IpPermissionsEgress": [
+			{
+			    "IpProtocol": "-1",
+			    "IpRanges": [
+				{
+				    "CidrIp": "0.0.0.0/0"
+				}
+			    ],
+			    "UserIdGroupPairs": [],
+			    "PrefixListIds": []
+			}
+		    ],
+		    "Description": "default VPC security group",
+		    "IpPermissions": [
+			{
+			    "IpProtocol": "-1",
+			    "IpRanges": [],
+			    "UserIdGroupPairs": [
+				{
+				    "UserId": "387705308362",
+				    "GroupId": "sg-c70ff2a1"
+				}
+			    ],
+			    "PrefixListIds": []
+			}
+		    ],
+		    "GroupName": "default",
 		    "VpcId": "vpc-120cd476",
-		    "InstanceTenancy": "default",
-		    "State": "available",
-		    "DhcpOptionsId": "dopt-5bf9023e",
-		    "CidrBlock": "172.31.0.0/16",
-		    "IsDefault": true
+		    "OwnerId": "387705308362",
+		    "GroupId": "sg-c70ff2a1"
 		}
 	    ]
 	}
 
-As you can see my vpc id is vpc-120cd476 and the IsDefault key has the value
-true so it's my default vpc.
+As you can see from the output, my default vpc group has the id sg-c70ff2a1 and belongs
+to the vpc with id vpc-120cd476. We will se some of this data during the next steps.
+This security group allows all traffic between resources that belongs to the group.
+The only thing that we are going to need is access to the port 22 for getting
+ssh access to our instances. We'll do that later.
 
-Now that we have this info, let's create the security group. Just replace the 
-vpc-id parameter with yours.
+
+Our instances are going to need an IAM Role in order to allow certain actions
+on the ECS infrastructure. Lucky for us, amazon has already defined the set
+of policies that we need. So we just have to create the Role, attach the 
+policy, and then add that role to an instance profile so we can add the
+Role on launching time of our instances.
+
+In the deploy folder of the project, you'll find an standard trust policy for
+creating our role. Just copy the file and run this command replacing your
+path to the file.
 
 {linenos=off}
-	aws ec2 create-security-group --group-name cluster-sg --description "Searchapp cluster security group" --vpc-id vpc-120cd476
+	$ aws iam create-role --role-name ecsInstanceRole --assume-role-policy-document file://policies/AmazonEC2ContainerServiceforEC2Role-Trust-Policy.json
 
 Output:
 
 {linenos=off}
 	{
-	    "GroupId": "sg-1b0af77d"
+	    "Role": {
+		"AssumeRolePolicyDocument": {
+		    "Version": "2012-10-17",
+		    "Statement": {
+			"Action": "sts:AssumeRole",
+			"Effect": "Allow",
+			"Principal": {
+			    "Service": "ec2.amazonaws.com"
+			}
+		    }
+		},
+		"RoleId": "AROAIIH2CKLXDXCQ3YS4Q",
+		"CreateDate": "2015-10-08T23:01:52.285Z",
+		"RoleName": "ecsInstanceRole",
+		"Path": "/",
+		"Arn": "arn:aws:iam::387705308362:role/ecsInstanceRole"
+	    }
 	}
 
-And now let's add authorization for ssh access. Replace the group-id with the id
-returned in the previous command, and the cidr with your vpc cidr (output from describe-vpcs):
+Now, let's attach the policy to our new ecsInstanceRole role:
 
 {linenos=off}
-	aws ec2 authorize-security-group-ingress --group-id sg-1b0af77d --protocol tcp --port 22 --cidr 172.31.0.0/16
+	$ aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role --role-name ecsInstanceRole
 
-This command doesn't produce any output.
+The final step is to create the instace profile and attach the Role to that profile:
 
+{linenos=off}
+	$ aws iam create-instance-profile --instance-profile-name ecsInstanceRole
+
+Output:
+
+{linenos=off}
+	{
+	    "InstanceProfile": {
+		"InstanceProfileId": "AIPAI5CUZHG54Y7P6V5SG",
+		"Roles": [],
+		"CreateDate": "2015-10-08T23:04:44.535Z",
+		"InstanceProfileName": "ecsInstanceRole",
+		"Path": "/",
+		"Arn": "arn:aws:iam::387705308362:instance-profile/ecsInstanceRole"
+	    }
+	}
+
+And attaching...
+
+{linenos=off}
+	$ aws iam add-role-to-instance-profile --instance-profile-name ecsInstanceRole --role-name ecsInstanceRole
+
+
+This command doesn't return any output.
+
+Now we are ready to launch the instances for the cluster.
+
+The AMI that we'll use is amzn-ami-2015.03.g-amazon-ecs-optimized with the id
+ami-4fe4852a. This image comes ready and optimized for ECS.
+
+We are going to launch 2 instances of type t2.micro and we are going to use
+the keys and instance Role that were created previously, one of our subnets and
+the security group for the default vpc.
+
+For getting the available subnets, run:
+
+{linenos=off}
+	$ aws ec2 describe-subnets
+
+Output:
+
+{linenos=off}
+	{
+	    "Subnets": [
+		{
+		    "VpcId": "vpc-120cd476",
+		    "CidrBlock": "172.31.0.0/20",
+		    "MapPublicIpOnLaunch": true,
+		    "DefaultForAz": true,
+		    "State": "available",
+		    "AvailabilityZone": "us-east-1d",
+		    "SubnetId": "subnet-39706b4e",
+		    "AvailableIpAddressCount": 4091
+		},
+		{
+		    "VpcId": "vpc-120cd476",
+		    "CidrBlock": "172.31.16.0/20",
+		    "MapPublicIpOnLaunch": true,
+		    "DefaultForAz": true,
+		    "State": "available",
+		    "AvailabilityZone": "us-east-1a",
+		    "SubnetId": "subnet-fa724fa3",
+		    "AvailableIpAddressCount": 4091
+		},
+		{
+		    "VpcId": "vpc-120cd476",
+		    "CidrBlock": "172.31.48.0/20",
+		    "MapPublicIpOnLaunch": true,
+		    "DefaultForAz": true,
+		    "State": "available",
+		    "AvailabilityZone": "us-east-1c",
+		    "SubnetId": "subnet-4660426d",
+		    "AvailableIpAddressCount": 4091
+		},
+		{
+		    "VpcId": "vpc-120cd476",
+		    "CidrBlock": "172.31.32.0/20",
+		    "MapPublicIpOnLaunch": true,
+		    "DefaultForAz": true,
+		    "State": "available",
+		    "AvailabilityZone": "us-east-1e",
+		    "SubnetId": "subnet-477ea97a",
+		    "AvailableIpAddressCount": 4091
+		}
+	    ]
+	}
+
+I have 4 available subnets, all in my default vpc. I'll choose the first
+one for launching the instances.
+
+In the following command replace the security-groups-ids with your default
+vpc security group id, your subnet-id and the Arn of the instance profile which
+you can find in the output of the create-instance-profile.
+
+The user-data parameter allow us to add some initial configuration to the instances.
+In our case we are passing the necessary configuration for registering the instances
+in our searchapp cluster. The user-data.sh file looks like this (also in the deploy folder):
+
+{linenos=off}
+	#!/bin/bash
+	echo ECS_CLUSTER=searchapp >> /etc/ecs/ecs.config
+
+Now we can run the command for launching the instances:
+
+{linenos=off}
+	$ aws ec2 run-instances --image-id ami-4fe4852a --count 2 --instance-type t2.micro --key-name keys_cluster --security-group-ids sg-c70ff2a1 --subnet-id subnet-39706b4e  --iam-instance-profile Arn=arn:aws:iam::387705308362:instance-profile/ecsInstanceRole --associate-public-ip-address --user-data file://user-data/user-data.sh
+
+Output:
+
+{linenos=off}
+	{
+	    "OwnerId": "387705308362",
+	    "ReservationId": "r-9dcb8660",
+	    "Groups": [],
+	    "Instances": [
+		{
+		    "Monitoring": {
+			"State": "disabled"
+		    },
+		    "PublicDnsName": "",
+		    "RootDeviceType": "ebs",
+		    "State": {
+			"Code": 0,
+			"Name": "pending"
+		    },
+		    "EbsOptimized": false,
+		    "LaunchTime": "2015-10-08T23:21:46.000Z",
+		    "PrivateIpAddress": "172.31.5.238",
+		    "ProductCodes": [],
+		    "VpcId": "vpc-120cd476",
+		    "StateTransitionReason": "",
+		    "InstanceId": "i-f7b07a23",
+		    "ImageId": "ami-4fe4852a",
+		    "PrivateDnsName": "ip-172-31-5-238.ec2.internal",
+		    "KeyName": "keys_cluster",
+		    "SecurityGroups": [
+			{
+			    "GroupName": "default",
+			    "GroupId": "sg-c70ff2a1"
+			}
+		    ],
+		....
+		....
+
+You can poll the status of the launched instances using the command
+
+{linenos=off}
+	$ aws ec2 describe-instances
+
+
+After a few minutes, try running this command for polling the state of the cluster
+and see if the instances were correctly registered:
+
+{linenos=off}
+	$ aws ecs describe-clusters --clusters searchapp
+
+Output:
+{linenos=off}
+	{
+	    "clusters": [
+		{
+		    "status": "ACTIVE",
+		    "clusterName": "searchapp",
+		    "registeredContainerInstancesCount": 2,
+		    "pendingTasksCount": 0,
+		    "runningTasksCount": 0,
+		    "activeServicesCount": 0,
+		    "clusterArn": "arn:aws:ecs:us-east-1:387705308362:cluster/searchapp"
+		}
+	    ],
+	    "failures": []
+	}
+
+Great, the output is telling me that the searchapp cluster has 2 registered instances.
