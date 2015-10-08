@@ -326,6 +326,7 @@ and see if the instances were correctly registered:
 	$ aws ecs describe-clusters --clusters searchapp
 
 Output:
+
 {linenos=off}
 	{
 	    "clusters": [
