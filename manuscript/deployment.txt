@@ -27,7 +27,7 @@ Output:
 	    }
 	}
 
-AS you can see, the cluster was created successfully, it has zero EC2 container
+The cluster was created successfully, it has zero EC2 container
 instances registered, zero task running and no services.
 
 The idea behind the ECS cluster is that you can forget about where and how you're
@@ -49,9 +49,10 @@ Let's create our key pair:
 	aws ec2 create-key-pair --key-name keys_cluster
 
 Output:
+
 {linenos=off}
 	{
-	    "KeyMaterial": "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEAoB4e1mRD+c31WuYfGdbS8YmBn/yoD5T3RCACdkhNsk0XTOfSQrs0x\nq2svj16JIWLo0hYgI/4r0R8s8tpyK7WKWEdx83ElIyc+2kQqvMngD4j5oOvaXJzh4/vRYlVBrP6j\npkPmFc2CMadW96IIsdWHNL9oKnFM/dtmp81k/wqhce5q4YHYNXN93jQCnCcUZ3cSqmVatcJ9BdHm\nz7kD/NeZEapLbK1qnn3IM4vs9q27R2UMd1T1MlAT4lU0fPdxXNWG+5BItweq/2kk5Qv76fTwch5J\nbU7R+Y3Dxl25XwDU5KWnP9eUbvwDNXKHS/uKUUe5lN407NYkS41HWQIDAQABAoIBAQCXyBW5a/CY\nI+n60fwXdXIfbxcGvu3dX3wL8Cr0lEcAfz02RK2Tp9g0ryZb3b3A3mmGQbpCgM1tIXY0SGPm5+On\nDvZ9gqjzSD6348Ctky1coJPWxJN2hoUES6+CbWEgyfxRd7o7MGOXX/QDJP3O7e9d7SbK1TxG/07S\nNPckCdBFLcez37LNk2KZF7Es1DYllDWUvBHCC1iRB1XK52d3RcLhRMypSEU3cx/sxvpZ2SXqdYaR\nhvuXzbJi9eF1lq5i/uoxR3QtdX3Xga7DbNNhHSqV1FNCH7HhElrRRuN7aDh1DJSiSJDjrWR1GV5f\nNKFmprZq+wOaqg5IerdCYRwCxbuRAoGBAOMr7mcHQD9afBUTpF8oUiHivCN/RIIodr2ArkF69Ovs\nUFQrc7qL3sVfb56fVEhUG4r1g60bx7LXgFGVOfz/C5v6RV/J68heOfqJSIoeLi1M+Wb21tdrrIP4\nvD9pI/Otp4L8Dniwk3fox2MuDoUqd1fpeA7bE/OePxddbDlFIWzdAoGBALRv0unhUcD64jt0f3/a\nca2XJ8VtxTbkgiplDTvsQW4oPzhg3rGQBGJL7iz6i3qbryl1sjMQaI8HxDylq08mQIu9Vs0L7YBe\n/hZ6eeaswTnJBeXbtkjKGX1HPNAgY3evbmTGKRt+ombHPhEE2gYHnkMxxIzbTCCCjIpSfMCWEy6t\nAoGARamWHPADSqozvL7eO/QAY7XE3dnMJ2HDL8+DID9VVfeMlpMQlRcJRFtEvk67qMZp/83UCESp\nk3U0O1BYjPWlGLrBhWNFM5d5jhOFNB2XKXseS+3L6hlxuLKQ/5z9Ul9hK/Che28iebXfVtGr0Dg6\nirHkiCG0V5OiY0bZxiIl4t0CgYByL7on7EGSgLKesZDmVlVOZ7PxixAdNurw7VY8r7yQe8PWZ+dG\nMz+y/R5TNJMEGnX1JNiK3D1vFpknUChjRG/gfwfpZzz72iGuFAAE7Rqy+PZUioCG++65i1V+2KBZ\n45lXCNiG39LifABZQNrAqh2LpHkgMr+way2Jc74jGlY1WQKBgQCNH0rPNyk/NH5JHNazV5Rk0Ot+\nm+xs3Fo4YueKWN9fw17g8gN2oMT59eNFnT0OBIXvRtSoGLSBrqlS3DhPYjSZIjIarpPph8MDPKtl\ns/4EogOKf8MpaGAolvqTNFaWDmu3w1BXzkI9vC/tghBPXPnQRH2JkW4xOd9Mv59DgwGo/w==\n-----END RSA PRIVATE KEY-----",
+	    "KeyMaterial": "-----BEGIN RSA PRIVATE KEY-----\nTHEPRIVATEKEY==\n-----END RSA PRIVATE KEY-----",
 	    "KeyName": "keys_cluster",
 	    "KeyFingerprint": "69:90:35:93:a8:db:fe:d0:77:00:82:35:b6:84:2a:98:6d:43:30:b5"
 	}
@@ -84,6 +85,7 @@ The command for getting your default VPC attributes is:
 	aws ec2 describe-vpcs
 
 Output:
+
 {linenos=off}
 	{
 	    "Vpcs": [
@@ -108,6 +110,7 @@ vpc-id parameter with yours.
 	aws ec2 create-security-group --group-name cluster-sg --description "Searchapp cluster security group" --vpc-id vpc-120cd476
 
 Output:
+
 {linenos=off}
 	{
 	    "GroupId": "sg-1b0af77d"
