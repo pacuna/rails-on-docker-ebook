@@ -344,3 +344,197 @@ Output:
 	}
 
 Great, the output is telling me that the searchapp cluster has 2 registered instances.
+
+## Tasks definitions for the dependencies
+
+### MySQL
+
+The task definition will contain the information of the container that you
+will run. You can create the task definition using json format, and the register 
+the task in your cluster using the aws cli.
+You can find all the task defitions used in this book in the deploy/task-definitions
+directory of the source code repository.
+
+{linenos=off}
+	{
+	    "containerDefinitions": [
+		{
+		    "volumesFrom": [],
+		    "memory": 256,
+		    "extraHosts": null,
+		    "dnsServers": null,
+		    "disableNetworking": null,
+		    "dnsSearchDomains": null,
+		    "portMappings": [
+			{
+			    "hostPort": 3306,
+			    "containerPort": 3306,
+			    "protocol": "tcp"
+			}
+		    ],
+		    "hostname": null,
+		    "essential": true,
+		    "entryPoint": [],
+		    "mountPoints": [
+			{
+			    "containerPath": "/var/lib/mysql",
+			    "sourceVolume": "mysql-data",
+			    "readOnly": false
+			}
+		    ],
+		    "name": "searchapp-db",
+		    "ulimits": null,
+		    "dockerSecurityOptions": null,
+		    "environment": [
+			{
+			    "name": "MYSQL_DATABASE",
+			    "value": "searchapp_production"
+			},
+			{
+			    "name": "MYSQL_PASSWORD",
+			    "value": "mysecretpassword"
+			},
+			{
+			    "name": "MYSQL_ROOT_PASSWORD",
+			    "value": "mysupersecretpassword"
+			},
+			{
+			    "name": "MYSQL_USER",
+			    "value": "searchappusr"
+			}
+		    ],
+		    "links": [],
+		    "workingDirectory": null,
+		    "readonlyRootFilesystem": null,
+		    "image": "mysql:5.7",
+		    "command": [],
+		    "user": null,
+		    "dockerLabels": null,
+		    "logConfiguration": null,
+		    "cpu": 128,
+		    "privileged": null
+		}
+	    ],
+	    "volumes": [
+		{
+		    "host": {
+			"sourcePath": null
+		    },
+		    "name": "mysql-data"
+		}
+	    ],
+	    "family": "searchapp-db"
+	}
+
+This template might look complicated, but there's a lot of irrelevant information
+there. Actually, if you use the ECS console for registering task definitions, you'll
+see that most of the information can be ommited. 
+If you have used docker-compose in the past, you'll see some similaties between
+the structure of the definition. Here you also have port mapping, environment
+variables, links with other containers, and volumes for persisting container data.
+This task is mapping the port 3306 to the host, declaring the environment variables
+that the mysql image requires, and creating a volume for mounting the /var/lib/mysql
+directory. This approach will allow us to avoid data lost when the mysql container
+is restarted. The problem is that we are now coupled to an particular instance, since
+ECS doesn't sync the data between instances. This is still a dark area in the containers
+world and it's why some people prefer to run only stateless application on containers
+and use more typical approaches for their database resources.
+
+The command for register this task in our cluster is:
+
+{linenos=off}
+	$ aws ecs register-task-definition --cli-input-json file://task-definitions/mysql.json
+
+Output:
+
+{linenos=off}
+	{
+	    "taskDefinition": {
+		"status": "ACTIVE",
+		"family": "searchapp-db",
+		"volumes": [
+		    {
+			"host": {},
+			"name": "mysql-data"
+		    }
+		],
+		"taskDefinitionArn": "arn:aws:ecs:us-east-1:387705308362:task-definition/searchapp-db:1",
+		"containerDefinitions": [
+		    {
+			"environment": [
+			    {
+				"name": "MYSQL_DATABASE",
+				"value": "searchapp_production"
+			    },
+			    {
+				"name": "MYSQL_PASSWORD",
+				"value": "mysecretpassword"
+			    },
+			    {
+				"name": "MYSQL_ROOT_PASSWORD",
+				"value": "mysupersecretpassword"
+			    },
+			    {
+				"name": "MYSQL_USER",
+				"value": "searchappusr"
+			    }
+			],
+			"name": "searchapp-db",
+			"links": [],
+			"mountPoints": [
+			    {
+				"sourceVolume": "mysql-data",
+				"readOnly": false,
+				"containerPath": "/var/lib/mysql"
+			    }
+			],
+			"image": "mysql:5.7",
+			"essential": true,
+			"portMappings": [
+			    {
+				"protocol": "tcp",
+				"containerPort": 3306,
+				"hostPort": 3306
+			    }
+			],
+			"entryPoint": [],
+			"memory": 256,
+			"command": [],
+			"cpu": 128,
+			"volumesFrom": []
+		    }
+		],
+		"revision": 1
+	    }
+	}
+
+Great, our task was created successfully. Now every time we make changes
+to this taks, a new revision will be created as long as we use the same
+family value when registering the new json file.
+Also, now we can run a service scheduler for running a task using this task definition.
+The service will be in charge of allocating the task somewhere in the cluster and
+restarting the task if the container fail for some reason.
+Since the service associated with this task will deploy the container anywhere
+in the cluster, we need some mechanism for getting some static value that will
+point to the task, in this case the mysql server. The native way to accomplish
+this in ECS is to create an Elastic Load Balancer and then when you define the service
+you can add an option for attaching it to the ELB. This way, even is the service
+allocates the task in a different instance between deploys, it will always be
+attached to the ELB.
+
+Let's create an ELB for the MySQL container. Remember to change the subnet and the
+security group with your default or custom vpc information.
+
+{linenos=off}
+	$ aws elb create-load-balancer --load-balancer-name mysql-elb --listeners "Protocol=TCP,LoadBalancerPort=80,InstanceProtocol=TCP,InstancePort=3306" --subnets subnet-39706b4e --security-groups sg-c70ff2a1
+
+Output:
+
+{linenos=off}
+	{
+	    "DNSName": "mysql-elb-1267740639.us-east-1.elb.amazonaws.com"
+	}
+
+The output is telling us where we should point our database url configuration in our Rails application. This
+ELB will be pointing to an EC2 instance, in which the container will be running and mapping
+its 3306 to the 3306 port of the instance.
