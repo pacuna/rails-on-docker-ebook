@@ -322,59 +322,59 @@ the task in your cluster using the aws cli.
 You can find all the task defitions used in this book in the deploy/task-definitions
 directory of the source code repository.
 
-{
-    "containerDefinitions": [
-        {
-            "volumesFrom": [],
-            "memory": 256,
-            "portMappings": [
-                {
-                    "hostPort": 3306,
-                    "containerPort": 3306,
-                    "protocol": "tcp"
-                }
-            ],
-            "essential": true,
-            "entryPoint": [],
-            "mountPoints": [
-                {
-                    "containerPath": "/var/lib/mysql",
-                    "sourceVolume": "mysql-data",
-                    "readOnly": false
-                }
-            ],
-            "name": "searchapp-db",
-            "environment": [
-                {
-                    "name": "MYSQL_DATABASE",
-                    "value": "searchapp_production"
-                },
-                {
-                    "name": "MYSQL_PASSWORD",
-                    "value": "mysecretpassword"
-                },
-                {
-                    "name": "MYSQL_ROOT_PASSWORD",
-                    "value": "mysupersecretpassword"
-                },
-                {
-                    "name": "MYSQL_USER",
-                    "value": "searchappusr"
-                }
-            ],
-            "links": [],
-            "image": "mysql:5.7",
-            "command": [],
-            "cpu": 128
-        }
-    ],
-    "volumes": [
-        {
-            "name": "mysql-data"
-        }
-    ],
-    "family": "searchapp-db"
-}
+    {
+	"containerDefinitions": [
+	    {
+		"volumesFrom": [],
+		"memory": 256,
+		"portMappings": [
+		    {
+			"hostPort": 3306,
+			"containerPort": 3306,
+			"protocol": "tcp"
+		    }
+		],
+		"essential": true,
+		"entryPoint": [],
+		"mountPoints": [
+		    {
+			"containerPath": "/var/lib/mysql",
+			"sourceVolume": "mysql-data",
+			"readOnly": false
+		    }
+		],
+		"name": "searchapp-db",
+		"environment": [
+		    {
+			"name": "MYSQL_DATABASE",
+			"value": "searchapp_production"
+		    },
+		    {
+			"name": "MYSQL_PASSWORD",
+			"value": "mysecretpassword"
+		    },
+		    {
+			"name": "MYSQL_ROOT_PASSWORD",
+			"value": "mysupersecretpassword"
+		    },
+		    {
+			"name": "MYSQL_USER",
+			"value": "searchappusr"
+		    }
+		],
+		"links": [],
+		"image": "mysql:5.7",
+		"command": [],
+		"cpu": 128
+	    }
+	],
+	"volumes": [
+	    {
+		"name": "mysql-data"
+	    }
+	],
+	"family": "searchapp-db"
+    }
 
 This template might look complicated, but there's a lot of irrelevant information
 there. Actually, if you use the ECS console for registering task definitions, you'll
