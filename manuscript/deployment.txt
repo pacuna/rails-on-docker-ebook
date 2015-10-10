@@ -9,12 +9,10 @@
 We can create the cluster using one simple command. The only parameter
 that we need is the cluster name.
 
-{linenos=off}
 	$ aws ecs create-cluster --cluster-name "searchapp"
 
 Output:
 
-{linenos=off}
 	{
 	    "cluster": {
 		"status": "ACTIVE",
@@ -43,45 +41,26 @@ in our cluster. For launching the instances we'll need:
 - A Key Pair for ssh access
 - A Security Group
 
-Let's create our key pair:
+Let's create our key pair and send the key to a pem file by querying the KeyMaterial
+key from the output:
 
-{linenos=off}
-	$ aws ec2 create-key-pair --key-name keys_cluster
+	$ aws ec2 create-key-pair --key-name ClusterKeyPair --query 'KeyMaterial' --output text > ClusterKeyPair.pem
 
-Output:
+Set the permissions of the file:
 
-{linenos=off}
-	{
-	    "KeyMaterial": "-----BEGIN RSA PRIVATE KEY-----\nTHEPRIVATEKEY==\n-----END RSA PRIVATE KEY-----",
-	    "KeyName": "keys_cluster",
-	    "KeyFingerprint": "69:90:35:93:a8:db:fe:d0:77:00:82:35:b6:84:2a:98:6d:43:30:b5"
-	}
+	$ chmod 400 ClusterKeyPair.pem
 
-Create a file named key_cluster.pem and paste the entire key (the value of the KeyMaterial key).
-Don't forget the lines:
-
-{linenos=off}
-	"----BEGIN RSA PRIVATE KEY----"
-	"-----END RSA PRIVATE KEY-----" 
-
-Now set the permissions of the file:
-
-{linenos=off}
-	$ chmod 400 cluster.pem
-
-Now move the file to your ssh keys directory or some place safe. Remember
-that with just this file you'll be able to ssh into your cluster instances.
+And move the file to your ssh keys directory or some place safe. Remember
+with just this file you'll be able to ssh into your cluster instances.
 
 For the security groups for the instances, we can use our default security group
 for our default vpc. In order to get the information for our default vpc security
 group, you can run:
 
-{linenos=off}
 	$ aws ec2 describe-security-groups
 
 Output:
 
-{linenos=off}
 	{
 	    "SecurityGroups": [
 		{
@@ -136,12 +115,10 @@ In the deploy folder of the project, you'll find an standard trust policy for
 creating our role. Just copy the file and run this command replacing your
 path to the file.
 
-{linenos=off}
 	$ aws iam create-role --role-name ecsInstanceRole --assume-role-policy-document file://policies/AmazonEC2ContainerServiceforEC2Role-Trust-Policy.json
 
 Output:
 
-{linenos=off}
 	{
 	    "Role": {
 		"AssumeRolePolicyDocument": {
@@ -164,17 +141,14 @@ Output:
 
 Now, let's attach the policy to our new ecsInstanceRole role:
 
-{linenos=off}
 	$ aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role --role-name ecsInstanceRole
 
 The final step is to create the instace profile and attach the Role to that profile:
 
-{linenos=off}
 	$ aws iam create-instance-profile --instance-profile-name ecsInstanceRole
 
 Output:
 
-{linenos=off}
 	{
 	    "InstanceProfile": {
 		"InstanceProfileId": "AIPAI5CUZHG54Y7P6V5SG",
@@ -188,7 +162,6 @@ Output:
 
 And attaching...
 
-{linenos=off}
 	$ aws iam add-role-to-instance-profile --instance-profile-name ecsInstanceRole --role-name ecsInstanceRole
 
 
@@ -205,12 +178,10 @@ the security group for the default vpc.
 
 For getting the available subnets, run:
 
-{linenos=off}
 	$ aws ec2 describe-subnets
 
 Output:
 
-{linenos=off}
 	{
 	    "Subnets": [
 		{
@@ -267,67 +238,63 @@ The user-data parameter allow us to add some initial configuration to the instan
 In our case we are passing the necessary configuration for registering the instances
 in our searchapp cluster. The user-data.sh file looks like this (also in the deploy folder):
 
-{linenos=off}
 	#!/bin/bash
 	echo ECS_CLUSTER=searchapp >> /etc/ecs/ecs.config
 
 Now we can run the command for launching the instances:
 
-{linenos=off}
-	$ aws ec2 run-instances --image-id ami-4fe4852a --count 2 --instance-type t2.micro --key-name keys_cluster --security-group-ids sg-c70ff2a1 --subnet-id subnet-39706b4e  --iam-instance-profile Arn=arn:aws:iam::387705308362:instance-profile/ecsInstanceRole --associate-public-ip-address --user-data file://user-data/user-data.sh
+	$ aws ec2 run-instances --image-id ami-4fe4852a --count 2 --instance-type t2.micro --key-name ClusterKeyPair --security-group-ids sg-c70ff2a1 --subnet-id subnet-39706b4e  --iam-instance-profile Arn=arn:aws:iam::387705308362:instance-profile/ecsInstanceRole --associate-public-ip-address --user-data file://user-data/user-data.sh
 
 Output:
 
-{linenos=off}
-	{
-	    "OwnerId": "387705308362",
-	    "ReservationId": "r-9dcb8660",
-	    "Groups": [],
-	    "Instances": [
-		{
-		    "Monitoring": {
-			"State": "disabled"
-		    },
-		    "PublicDnsName": "",
-		    "RootDeviceType": "ebs",
-		    "State": {
-			"Code": 0,
-			"Name": "pending"
-		    },
-		    "EbsOptimized": false,
-		    "LaunchTime": "2015-10-08T23:21:46.000Z",
-		    "PrivateIpAddress": "172.31.5.238",
-		    "ProductCodes": [],
-		    "VpcId": "vpc-120cd476",
-		    "StateTransitionReason": "",
-		    "InstanceId": "i-f7b07a23",
-		    "ImageId": "ami-4fe4852a",
-		    "PrivateDnsName": "ip-172-31-5-238.ec2.internal",
-		    "KeyName": "keys_cluster",
-		    "SecurityGroups": [
-			{
-			    "GroupName": "default",
-			    "GroupId": "sg-c70ff2a1"
-			}
-		    ],
-		....
-		....
+    {
+	"OwnerId": "387705308362",
+	"ReservationId": "r-202269dd",
+	"Groups": [],
+	"Instances": [
+	    {
+		"Monitoring": {
+		    "State": "disabled"
+		},
+		"PublicDnsName": "",
+		"RootDeviceType": "ebs",
+		"State": {
+		    "Code": 0,
+		    "Name": "pending"
+		},
+		"EbsOptimized": false,
+		"LaunchTime": "2015-10-10T02:13:50.000Z",
+		"PrivateIpAddress": "172.31.1.132",
+		"ProductCodes": [],
+		"VpcId": "vpc-120cd476",
+		"StateTransitionReason": "",
+		"InstanceId": "i-8272af56",
+		"ImageId": "ami-4fe4852a",
+		"PrivateDnsName": "ip-172-31-1-132.ec2.internal",
+		"KeyName": "ClusterKeyPair",
+		"SecurityGroups": [
+		    {
+			"GroupName": "default",
+			"GroupId": "sg-c70ff2a1"
+		    }
+		],
+		"ClientToken": "",
+		"SubnetId": "subnet-39706b4e",
+		"InstanceType": "t2.micro",
+		...
 
 You can poll the status of the launched instances using the command
 
-{linenos=off}
 	$ aws ec2 describe-instances
 
 
 After a few minutes, try running this command for polling the state of the cluster
 and see if the instances were correctly registered:
 
-{linenos=off}
 	$ aws ecs describe-clusters --clusters searchapp
 
 Output:
 
-{linenos=off}
 	{
 	    "clusters": [
 		{
@@ -355,7 +322,6 @@ the task in your cluster using the aws cli.
 You can find all the task defitions used in this book in the deploy/task-definitions
 directory of the source code repository.
 
-{linenos=off}
 {
     "containerDefinitions": [
         {
@@ -426,12 +392,10 @@ and use more typical approaches for their database resources.
 
 The command for register this task in our cluster is:
 
-{linenos=off}
 	$ aws ecs register-task-definition --cli-input-json file://task-definitions/mysql.json
 
 Output:
 
-{linenos=off}
 	{
 	    "taskDefinition": {
 		"status": "ACTIVE",
@@ -509,12 +473,10 @@ attached to the ELB.
 Let's create an ELB for the MySQL container. Remember to change the subnet and the
 security group with your default or custom vpc information.
 
-{linenos=off}
 	$ aws elb create-load-balancer --load-balancer-name mysql-elb --listeners "Protocol=TCP,LoadBalancerPort=80,InstanceProtocol=TCP,InstancePort=3306" --subnets subnet-39706b4e --security-groups sg-c70ff2a1
 
 Output:
 
-{linenos=off}
 	{
 	    "DNSName": "mysql-elb-1267740639.us-east-1.elb.amazonaws.com"
 	}
@@ -522,3 +484,283 @@ Output:
 The output is telling us where we should point our database url configuration in our Rails application. This
 ELB will be pointing to an EC2 instance, in which the container will be running and mapping
 its 3306 to the 3306 port of the instance.
+Let's run this task just for checking out if everything's ok. First we are going
+to make sure that the mysql that we just registered is actually on our task definitions
+list:
+
+    $ aws ecs list-task-definitions
+
+Output:
+
+    {
+	"taskDefinitionArns": [
+	    "arn:aws:ecs:us-east-1:387705308362:task-definition/searchapp-db:1"
+	]
+    }
+
+Great, so let's run a task using this task definition.
+You can run the task without a service with the following command:
+
+          $ aws ecs run-task --cluster searchapp --task-definition searchapp-db:1
+
+Output:
+
+    {
+	"failures": [],
+	"tasks": [
+	    {
+		"taskArn": "arn:aws:ecs:us-east-1:387705308362:task/99f26c75-b7f6-4f3c-a126-0d6b14684160",
+		"overrides": {
+		    "containerOverrides": [
+			{
+			    "name": "searchapp-db"
+			}
+		    ]
+		},
+		"lastStatus": "PENDING",
+		"containerInstanceArn": "arn:aws:ecs:us-east-1:387705308362:container-instance/52b56eb8-2657-45cb-8cb3-5fdcd008f162",
+		"clusterArn": "arn:aws:ecs:us-east-1:387705308362:cluster/searchapp",
+		"desiredStatus": "RUNNING",
+		"taskDefinitionArn": "arn:aws:ecs:us-east-1:387705308362:task-definition/searchapp-db:1",
+		"containers": [
+		    {
+			"containerArn": "arn:aws:ecs:us-east-1:387705308362:container/9ee2fd87-e252-4dde-bea5-ab2ae4b1abe5",
+			"taskArn": "arn:aws:ecs:us-east-1:387705308362:task/99f26c75-b7f6-4f3c-a126-0d6b14684160",
+			"lastStatus": "PENDING",
+			"name": "searchapp-db"
+		    }
+		]
+	    }
+	]
+    }
+
+For polling the status of the task, we are going to need its amazon arn identifier.
+We can get the running tasks with
+
+    $ aws ecs list-tasks --cluster searchapp
+
+Output:
+
+    {
+	"taskArns": [
+	    "arn:aws:ecs:us-east-1:387705308362:task/99f26c75-b7f6-4f3c-a126-0d6b14684160"
+	]
+    }
+
+The output contains just the Arn of the only task that we have launched. So
+let's get more information using that Arn:
+
+    $ aws ecs describe-tasks --cluster searchapp --tasks arn:aws:ecs:us-east-1:387705308362:task/99f26c75-b7f6-4f3c-a126-0d6b14684160
+
+Output:
+
+    {
+	"failures": [],
+	"tasks": [
+	    {
+		"taskArn": "arn:aws:ecs:us-east-1:387705308362:task/99f26c75-b7f6-4f3c-a126-0d6b14684160",
+		"overrides": {
+		    "containerOverrides": [
+			{
+			    "name": "searchapp-db"
+			}
+		    ]
+		},
+		"lastStatus": "RUNNING",
+		"containerInstanceArn": "arn:aws:ecs:us-east-1:387705308362:container-instance/52b56eb8-2657-45cb-8cb3-5fdcd008f162",
+		"clusterArn": "arn:aws:ecs:us-east-1:387705308362:cluster/searchapp",
+		"desiredStatus": "RUNNING",
+		"taskDefinitionArn": "arn:aws:ecs:us-east-1:387705308362:task-definition/searchapp-db:1",
+		"containers": [
+		    {
+			"containerArn": "arn:aws:ecs:us-east-1:387705308362:container/9ee2fd87-e252-4dde-bea5-ab2ae4b1abe5",
+			"taskArn": "arn:aws:ecs:us-east-1:387705308362:task/99f26c75-b7f6-4f3c-a126-0d6b14684160",
+			"name": "searchapp-db",
+			"networkBindings": [
+			    {
+				"protocol": "tcp",
+				"bindIP": "0.0.0.0",
+				"containerPort": 3306,
+				"hostPort": 3306
+			    }
+			],
+			"lastStatus": "RUNNING",
+			"exitCode": 0
+		    }
+		]
+	    }
+	]
+    }
+
+The output is giving us a full report about our tasks. We know that's running, so we can assume
+that the docker image wall pulled and run correctly, we know the Arn of the
+container Instance in which the task was launched,  and that the task is mapping the
+port 3306 of the container, with the port 3306 of the EC2 instance.
+
+Now, how can we know that the MySQL server is ready and waiting for connections?
+Well, all these resources are being launched using the default vpc security group, 
+which means that the resources have no restricted traffic access inside of the security
+group. Let's ssh into our of our instances and see if we can connect to the MySQL
+server.
+
+Let's try with the same instance that's running the task. Let's get more info
+about this instance using its Arn:
+
+    $ aws ecs describe-container-instances --cluster searchapp --container-instances arn:aws:ecs:us-east-1:387705308362:container-instance/52b56eb8-2657-45cb-8cb3-5fdcd008f162
+
+If look out the output, you'll find a section that contains the instance id:
+
+    "ec2InstanceId": "i-8272af56"
+
+With that id you can get the public ip address of the instance using the ec2 api:
+
+    $ aws ec2 describe-instances --instance-ids i-8272af56
+
+    {
+	"Reservations": [
+	    {
+		"OwnerId": "387705308362",
+		"ReservationId": "r-202269dd",
+		"Groups": [],
+		"Instances": [
+		    {
+			"Monitoring": {
+			    "State": "disabled"
+			},
+			"PublicDnsName": "ec2-52-23-203-99.compute-1.amazonaws.com",
+			"State": {
+			    "Code": 16,
+			    "Name": "running"
+			},
+			"EbsOptimized": false,
+			"LaunchTime": "2015-10-10T02:13:50.000Z",
+			"PublicIpAddress": "52.23.203.99",
+			"PrivateIpAddress": "172.31.1.132",
+    ...
+
+In my case the public dns of the instance is ec2-52-23-203-99.compute-1.amazonaws.com.
+If I try to connect to the MySQL server from my local machine, it will fail, since
+my ip is not in the vpc range. But we can ssh into the machine and try from there.
+
+In order to connect to the machine via ssh, we have to add a rule to the security group, 
+so the 22 port can be accessed from our ip. Remember to change the group-id with yours
+and the cird ip part with your local ip address.
+
+    $ aws ec2 authorize-security-group-ingress --group-id sg-c70ff2a1 --protocol tcp --port 22 --cidr 190.101.5.80/24
+
+
+Now you should be able to connect to the instance from your network using the pem and login with the
+ec2-user:
+
+    ssh -i ~/.ssh/keys/ClusterKeyPair.pem ec2-user@ec2-52-23-203-99.compute-1.amazonaws.com
+
+
+       __|  __|  __|
+       _|  (   \__ \   Amazon ECS-Optimized Amazon Linux AMI 2015.03.g
+     ____|\___|____/
+
+    For documentation visit, http://aws.amazon.com/documentation/ecs
+    No packages needed for security; 1 packages available
+    Run "sudo yum update" to apply all updates.
+    Amazon Linux version 2015.09 is available.
+    -bash: warning: setlocale: LC_CTYPE: cannot change locale (UTF-8): No such file or directory
+    [ec2-user@ip-172-31-1-132 ~]$
+
+Great! now that we are inside of the machine, let's try listing the running
+containers:
+
+    $ docker ps
+
+Output:
+
+    CONTAINER ID        IMAGE                            COMMAND                CREATED             STATUS              PORTS                        NAMES
+    fd8e52ad8b34        mysql:5.7                        "/entrypoint.sh mysq   6 minutes ago       Up 6 minutes        0.0.0.0:3306->3306/tcp       ecs-searchapp-db-1-searchapp-db-bc97e9d6f3bff4cba801
+    aadddba8536d        amazon/amazon-ecs-agent:latest   "/agent"               13 minutes ago      Up 13 minutes       127.0.0.1:51678->51678/tcp   ecs-agent
+
+So as expected, the mysql container is running, and also the amazon-ecs-agent.
+Let's see if we can connect to the MySQL service from this machine. For that
+we are going to have to install the MySQL client first:
+
+    # change to root user
+    $ sudo su
+    $ yum install mysql 
+    $ exit
+    # back to ec2-user
+    $ mysql -h ec2-52-23-203-99.compute-1.amazonaws.com -usearchappusr -pmysecretpassword
+
+Output:
+
+    Welcome to the MySQL monitor.  Commands end with ; or \g.
+    Your MySQL connection id is 2
+    Server version: 5.7.8-rc MySQL Community Server (GPL)
+
+    Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
+
+    Oracle is a registered trademark of Oracle Corporation and/or its
+    affiliates. Other names may be trademarks of their respective
+    owners.
+
+    Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+    mysql>
+
+
+Nice! we were able to connect the MySQL server using the credentials that we
+declared in the mysql task definition. The other instance registered in the cluster
+is also in the vpc default security group, so it should be able to connect to this
+server.
+
+But, we want to run this task using a service scheduler and attach the service
+to a load balancer, so let's stop this task using its Arn:
+
+    $ aws ecs stop-task --cluster searchapp --task arn:aws:ecs:us-east-1:387705308362:task/99f26c75-b7f6-4f3c-a126-0d6b14684160
+
+Output:
+
+    {
+	"task": {
+	    "taskArn": "arn:aws:ecs:us-east-1:387705308362:task/99f26c75-b7f6-4f3c-a126-0d6b14684160",
+	    "overrides": {
+		"containerOverrides": [
+		    {
+			"name": "searchapp-db"
+		    }
+		]
+	    },
+	    "lastStatus": "RUNNING",
+	    "containerInstanceArn": "arn:aws:ecs:us-east-1:387705308362:container-instance/52b56eb8-2657-45cb-8cb3-5fdcd008f162",
+	    "clusterArn": "arn:aws:ecs:us-east-1:387705308362:cluster/searchapp",
+	    "desiredStatus": "STOPPED",
+	    "taskDefinitionArn": "arn:aws:ecs:us-east-1:387705308362:task-definition/searchapp-db:1",
+	    "containers": [
+		{
+		    "containerArn": "arn:aws:ecs:us-east-1:387705308362:container/9ee2fd87-e252-4dde-bea5-ab2ae4b1abe5",
+		    "taskArn": "arn:aws:ecs:us-east-1:387705308362:task/99f26c75-b7f6-4f3c-a126-0d6b14684160",
+		    "name": "searchapp-db",
+		    "networkBindings": [
+			{
+			    "protocol": "tcp",
+			    "bindIP": "0.0.0.0",
+			    "containerPort": 3306,
+			    "hostPort": 3306
+			}
+		    ],
+		    "lastStatus": "RUNNING",
+		    "exitCode": 0
+		}
+	    ]
+	}
+    }
+
+You can see from the output that the desired status for the task is now STOPPED.
+If you run:
+
+    $ aws ecs list-tasks --cluster searchapp
+
+You'll see that there are no more tasks running:
+
+    {
+	"taskArns": []
+    }
+
+
