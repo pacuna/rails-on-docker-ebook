@@ -2,9 +2,7 @@
 
 ## Introduction
 
-## Setting up the cluster
-
-### Creating the cluster
+## Creating the cluster
 
 We can create the cluster using one simple command. The only parameter
 that we need is the cluster name.
@@ -33,7 +31,7 @@ task and services will be deployed. You just have to launch them and Amazon
 will take care of assigning the service or task to an instance. The only thing
 that we have to take care for now is adding some EC2 instances to the cluster.
 
-### Launching the EC2 instances
+## Launching the EC2 instances
 
 Now that we have our cluster, we can launch some instances and register them
 in our cluster. For launching the instances we'll need:
@@ -312,7 +310,7 @@ Output:
 
 Great, the output is telling me that the searchapp cluster has 2 registered instances.
 
-## Tasks definitions for the dependencies
+## Our first task definition
 
 ### MySQL
 
@@ -470,20 +468,26 @@ you can add an option for attaching it to the ELB. This way, even is the service
 allocates the task in a different instance between deploys, it will always be
 attached to the ELB.
 
-Let's create an ELB for the MySQL container. Remember to change the subnet and the
-security group with your default or custom vpc information.
+## Creating an ELB for our task
 
-	$ aws elb create-load-balancer --load-balancer-name mysql-elb --listeners "Protocol=TCP,LoadBalancerPort=80,InstanceProtocol=TCP,InstancePort=3306" --subnets subnet-39706b4e --security-groups sg-c70ff2a1
+Let's create an ELB for the MySQL container. Remember to change the subnet and the
+security group with your default or custom vpc information. This load balance
+will be internal because we just want to use it inside of our vpc network:
+
+    $ aws elb create-load-balancer --load-balancer-name mysql-elb --listeners Protocol=TCP,LoadBalancerPort=80,InstanceProtocol=TCP,InstancePort=3306 --subnets subnet-39706b4e --scheme internal --security-groups sg-c70ff2a1
 
 Output:
 
-	{
-	    "DNSName": "mysql-elb-1267740639.us-east-1.elb.amazonaws.com"
-	}
+    {
+	"DNSName": "internal-mysql-elb-1700927984.us-east-1.elb.amazonaws.com"
+    }
 
 The output is telling us where we should point our database url configuration in our Rails application. This
 ELB will be pointing to an EC2 instance, in which the container will be running and mapping
 its 3306 to the 3306 port of the instance.
+
+## Running the task
+
 Let's run this task just for checking out if everything's ok. First we are going
 to make sure that the mysql that we just registered is actually on our task definitions
 list:
@@ -501,7 +505,7 @@ Output:
 Great, so let's run a task using this task definition.
 You can run the task without a service with the following command:
 
-          $ aws ecs run-task --cluster searchapp --task-definition searchapp-db:1
+    $ aws ecs run-task --cluster searchapp --task-definition searchapp-db:1
 
 Output:
 
@@ -652,7 +656,9 @@ and the cird ip part with your local ip address.
 Now you should be able to connect to the instance from your network using the pem and login with the
 ec2-user:
 
-    ssh -i ~/.ssh/keys/ClusterKeyPair.pem ec2-user@ec2-52-23-203-99.compute-1.amazonaws.com
+    $ ssh -i ~/.ssh/keys/ClusterKeyPair.pem ec2-user@ec2-52-23-203-99.compute-1.amazonaws.com
+
+And you'll ssh into the instance:
 
 
        __|  __|  __|
@@ -764,3 +770,503 @@ You'll see that there are no more tasks running:
     }
 
 
+## Our first simple service
+
+Now that we know that our task definition works properly, let's create
+a service scheduler for managing this task. 
+This service will be connected to the ELB that we created previously.
+
+If you list your current services you'll see an empty response:
+
+    $ aws ecs list-services --cluster searchapp
+
+Output:
+
+    {
+	"serviceArns": []
+    }
+
+Let's create one for the MySQL task:
+
+    $ aws ecs create-service --cluster searchapp --service-name mysql-service --task-definition searchapp-db:1 --desired-count 1
+
+Output:
+
+    {
+	"service": {
+	    "status": "ACTIVE",
+	    "taskDefinition": "arn:aws:ecs:us-east-1:387705308362:task-definition/searchapp-db:1",
+	    "pendingCount": 0,
+	    "loadBalancers": [],
+	    "desiredCount": 1,
+	    "serviceName": "mysql-service",
+	    "clusterArn": "arn:aws:ecs:us-east-1:387705308362:cluster/searchapp",
+	    "serviceArn": "arn:aws:ecs:us-east-1:387705308362:service/mysql-service",
+	    "deployments": [
+		{
+		    "status": "PRIMARY",
+		    "pendingCount": 0,
+		    "createdAt": 1444447207.569,
+		    "desiredCount": 1,
+		    "taskDefinition": "arn:aws:ecs:us-east-1:387705308362:task-definition/searchapp-db:1",
+		    "updatedAt": 1444447207.569,
+		    "id": "ecs-svc/9223370592407568238",
+		    "runningCount": 0
+		}
+	    ],
+	    "events": [],
+	    "runningCount": 0
+	}
+    }
+
+The create-service command just needs the cluster name, the service name, the
+task definition for running the task, and the desired count of tasks. If you
+choose more than 1 running tasks, the task will be allocated in more than one
+instance, which in our case make sense, since the task is using a fixed port
+on the instance (3306), so it's not possible to have more than one of this task
+running on one instace.
+You can let ECS to pick a random port for your task, but then you would no be
+able to create a service attached to an ELB, since the ELB needs a static port
+for its listener.
+
+If you list your services again, you'll get the Arn for the service recently
+created:
+
+    $ aws ecs list-services --cluster searchapp
+
+    {
+	"serviceArns": [
+	    "arn:aws:ecs:us-east-1:387705308362:service/mysql-service"
+	]
+    }
+
+And you can run the describe-services command for get all the information for
+a service using its Arn identifier:
+
+    $ aws ecs describe-services --cluster searchapp --services arn:aws:ecs:us-east-1:387705308362:service/mysql-service
+
+    {
+	"services": [
+	    {
+		"status": "ACTIVE",
+		"taskDefinition": "arn:aws:ecs:us-east-1:387705308362:task-definition/searchapp-db:1",
+		"pendingCount": 0,
+		"loadBalancers": [],
+		"desiredCount": 1,
+		"serviceName": "mysql-service",
+		"clusterArn": "arn:aws:ecs:us-east-1:387705308362:cluster/searchapp",
+		"serviceArn": "arn:aws:ecs:us-east-1:387705308362:service/mysql-service",
+		"deployments": [
+		    {
+			"status": "PRIMARY",
+			"pendingCount": 0,
+			"createdAt": 1444447207.569,
+			"desiredCount": 1,
+			"taskDefinition": "arn:aws:ecs:us-east-1:387705308362:task-definition/searchapp-db:1",
+			"updatedAt": 1444447207.569,
+			"id": "ecs-svc/9223370592407568238",
+			"runningCount": 1
+		    }
+		],
+		"events": [
+		    {
+			"message": "(service mysql-service) has reached a steady state.",
+			"id": "13307911-f01a-44aa-bf79-b71ed2a9ca12",
+			"createdAt": 1444447226.492
+		    },
+		    {
+			"message": "(service mysql-service) has started 1 tasks: (task 8e710989-3ae2-40c5-a60b-258c12fbff47).",
+			"id": "08814d81-e268-4b5e-ad31-3c9cdd9658ab",
+			"createdAt": 1444447222.411
+		    }
+		],
+		"runningCount": 1
+	    }
+	],
+	"failures": []
+    }
+
+It's good to be familiarized with this kind of output, since later it's going to be
+very useful for troubleshooting issues with the service. The events section
+of the output tells us that the current state of the service and can show
+possible errors during the launch. Later we'll talk more about debugging issues.
+In our case, the service has started and has reached a steady state, which means
+there's no issues.
+
+So this is the most basic kind of service. Right now we need our service to
+be attached to the ELB for the MySQL server. For removing a service, first
+we have to update the desired count of tasks to zero:
+
+    $ aws ecs update-service --cluster searchapp --service mysql-service --desired-count 0
+
+Output
+
+    {
+	"service": {
+	    "status": "ACTIVE",
+	    "taskDefinition": "arn:aws:ecs:us-east-1:387705308362:task-definition/searchapp-db:1",
+	    "pendingCount": 0,
+	    "loadBalancers": [],
+	    "desiredCount": 0,
+	    "serviceName": "mysql-service",
+	    "clusterArn": "arn:aws:ecs:us-east-1:387705308362:cluster/searchapp",
+	    "serviceArn": "arn:aws:ecs:us-east-1:387705308362:service/mysql-service",
+	    "deployments": [
+		{
+		    "status": "PRIMARY",
+		    "pendingCount": 0,
+		    "createdAt": 1444447207.569,
+		    "desiredCount": 0,
+		    "taskDefinition": "arn:aws:ecs:us-east-1:387705308362:task-definition/searchapp-db:1",
+		    "updatedAt": 1444447207.569,
+		    "id": "ecs-svc/9223370592407568238",
+		    "runningCount": 1
+		}
+	    ],
+	    "events": [
+		{
+		    "message": "(service mysql-service) has reached a steady state.",
+		    "id": "13307911-f01a-44aa-bf79-b71ed2a9ca12",
+		    "createdAt": 1444447226.492
+		},
+		{
+		    "message": "(service mysql-service) has started 1 tasks: (task 8e710989-3ae2-40c5-a60b-258c12fbff47).",
+		    "id": "08814d81-e268-4b5e-ad31-3c9cdd9658ab",
+		    "createdAt": 1444447222.411
+		}
+	    ],
+	    "runningCount": 1
+	}
+    }
+
+After a minute, there will be no tasks running in the cluster. Let's delete the service:
+
+    $ aws ecs delete-service --cluster searchapp --service mysql-service
+
+Output:
+
+    {
+	"service": {
+	    "status": "DRAINING",
+	    "taskDefinition": "arn:aws:ecs:us-east-1:387705308362:task-definition/searchapp-db:1",
+	    "pendingCount": 0,
+	    "loadBalancers": [],
+	    "desiredCount": 0,
+	    "serviceName": "mysql-service",
+	    "clusterArn": "arn:aws:ecs:us-east-1:387705308362:cluster/searchapp",
+	    "serviceArn": "arn:aws:ecs:us-east-1:387705308362:service/mysql-service",
+	    "deployments": [
+		{
+		    "status": "PRIMARY",
+		    "pendingCount": 0,
+		    "createdAt": 1444447207.569,
+		    "desiredCount": 0,
+		    "taskDefinition": "arn:aws:ecs:us-east-1:387705308362:task-definition/searchapp-db:1",
+		    "updatedAt": 1444447949.667,
+		    "id": "ecs-svc/9223370592407568238",
+		    "runningCount": 0
+		}
+	    ],
+	    "events": [
+		{
+		    "message": "(service mysql-service) has reached a steady state.",
+		    "id": "258def28-8811-4b4d-a007-e15faba24618",
+		    "createdAt": 1444447968.859
+		},
+		{
+		    "message": "(service mysql-service) stopped 1 running tasks.",
+		    "id": "09237224-5800-4a96-ad48-fc078e216cde",
+		    "createdAt": 1444447965.169
+		},
+		{
+		    "message": "(service mysql-service) has reached a steady state.",
+		    "id": "13307911-f01a-44aa-bf79-b71ed2a9ca12",
+		    "createdAt": 1444447226.492
+		},
+		{
+		    "message": "(service mysql-service) has started 1 tasks: (task 8e710989-3ae2-40c5-a60b-258c12fbff47).",
+		    "id": "08814d81-e268-4b5e-ad31-3c9cdd9658ab",
+		    "createdAt": 1444447222.411
+		}
+	    ],
+	    "runningCount": 0
+	}
+    }
+
+The status of the service has changed to draining, which means that is going
+to dissapear from the cluster.
+
+## Our first more complex service
+
+The simple service created in the previous section was enough for catching
+the essentials of the workflow in ECS. You create your task definition, create
+a service that runs that task, when you don't need the task running anymore you
+update the desired-count of the service, and finally you can remove the service.
+
+Now, let's create a service connected to the ELB. For this case we are going to
+need a json file with the structure of the service. This is a good thing since now
+we can add our task definitions and our services definitions to our version control system.
+We're also going to need a new IAM Role, since this service requires more interaction
+with our resources, specially with the instances and ELBs. We can later use this
+same Role for the other services that we need.
+
+Use the file deploy/AmazonEC2ContainerServiceRole-Trust-Policy.json for the trust
+policy for this role:
+
+    $ aws iam create-role --role-name ecsServiceRole --assume-role-policy-document file://policies/AmazonEC2ContainerServiceRole-Trust-Policy.json
+
+Output:
+
+    {
+	"Role": {
+	    "AssumeRolePolicyDocument": {
+		"Version": "2012-10-17",
+		"Statement": {
+		    "Action": "sts:AssumeRole",
+		    "Effect": "Allow",
+		    "Principal": {
+			"Service": "ecs.amazonaws.com"
+		    }
+		}
+	    },
+	    "RoleId": "AROAI4JOLLGSAZ7PJWZKA",
+	    "CreateDate": "2015-10-10T03:49:23.138Z",
+	    "RoleName": "ecsServiceRole",
+	    "Path": "/",
+	    "Arn": "arn:aws:iam::387705308362:role/ecsServiceRole"
+	}
+    }
+
+And we need to attach the AmazonEC2ContainerServiceRole policy to this Role:
+
+    $ aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceRole --role-name ecsServiceRole
+
+Now that we have the Role, the json for the service should look like this (deploy/services/mysql-service.json):
+
+    {
+	"serviceName": "mysql-service",
+	    "taskDefinition": "searchapp-db:1",
+	    "loadBalancers": [
+	    {
+		"loadBalancerName": "mysql-elb",
+		"containerName": "searchapp-db",
+		"containerPort": 3306 
+	    }
+	    ],
+		"desiredCount": 1,
+		"role": "ecsServiceRole"
+    }
+
+And we create the service passing this file to the command (make sure you have the right path
+for the json file):
+
+    $ aws ecs create-service --cluster searchapp --service-name mysql-service --cli-input-json file://mysql-service.json
+
+Output:
+
+    {
+	"service": {
+	    "status": "ACTIVE",
+	    "taskDefinition": "arn:aws:ecs:us-east-1:387705308362:task-definition/searchapp-db:1",
+	    "pendingCount": 0,
+	    "loadBalancers": [
+		{
+		    "containerName": "searchapp-db",
+		    "containerPort": 3306,
+		    "loadBalancerName": "mysql-elb"
+		}
+	    ],
+	    "roleArn": "arn:aws:iam::387705308362:role/ecsServiceRole",
+	    "desiredCount": 1,
+	    "serviceName": "mysql-service",
+	    "clusterArn": "arn:aws:ecs:us-east-1:387705308362:cluster/searchapp",
+	    "serviceArn": "arn:aws:ecs:us-east-1:387705308362:service/mysql-service",
+	    "deployments": [
+		{
+		    "status": "PRIMARY",
+		    "pendingCount": 0,
+		    "createdAt": 1444451891.317,
+		    "desiredCount": 1,
+		    "taskDefinition": "arn:aws:ecs:us-east-1:387705308362:task-definition/searchapp-db:1",
+		    "updatedAt": 1444451891.317,
+		    "id": "ecs-svc/9223370592402884475",
+		    "runningCount": 0
+		},
+		{
+		    "status": "ACTIVE",
+		    "pendingCount": 0,
+		    "createdAt": 1444449447.38,
+		    "desiredCount": 0,
+		    "taskDefinition": "arn:aws:ecs:us-east-1:387705308362:task-definition/searchapp-db:1",
+		    "updatedAt": 1444451661.788,
+		    "id": "ecs-svc/9223370592405328421",
+		    "runningCount": 0
+		}
+	    ],
+	    "events": [],
+	    "runningCount": 0
+	}
+    }
+
+If we wait a minute and describe the service using its Arn in the events section we'll get:
+
+    $ aws ecs describe-services --cluster searchapp --services arn:aws:ecs:us-east-1:387705308362:service/mysql-service
+
+
+    {
+	"services": [
+	    {
+		"status": "ACTIVE",
+		"taskDefinition": "arn:aws:ecs:us-east-1:387705308362:task-definition/searchapp-db:1",
+		"pendingCount": 0,
+		"loadBalancers": [
+		    {
+			"containerName": "searchapp-db",
+			"containerPort": 3306,
+			"loadBalancerName": "mysql-elb"
+		    }
+		],
+		"roleArn": "arn:aws:iam::387705308362:role/ecsServiceRole",
+		"desiredCount": 1,
+		"serviceName": "mysql-service",
+		"clusterArn": "arn:aws:ecs:us-east-1:387705308362:cluster/searchapp",
+		"serviceArn": "arn:aws:ecs:us-east-1:387705308362:service/mysql-service",
+		"deployments": [
+		    {
+			"status": "PRIMARY",
+			"pendingCount": 0,
+			"createdAt": 1444451891.317,
+			"desiredCount": 1,
+			"taskDefinition": "arn:aws:ecs:us-east-1:387705308362:task-definition/searchapp-db:1",
+			"updatedAt": 1444451891.317,
+			"id": "ecs-svc/9223370592402884475",
+			"runningCount": 1
+		    }
+		],
+		"events": [
+		    {
+			"message": "(service mysql-service) registered 1 instances in (elb mysql-elb)",
+			"id": "171d065e-80ef-4aef-ab59-f8da4e3eab8a",
+			"createdAt": 1444451918.439
+		    },
+		    {
+			"message": "(service mysql-service) deregistered 1 instances in (elb mysql-elb)",
+			"id": "36b9bcee-d80c-476d-bc5e-e396201ca38e",
+			"createdAt": 1444451912.185
+		    },
+		    {
+			"message": "(service mysql-service) has started 1 tasks: (task 78120397-b542-44ce-903c-4b14549a7314).",
+			"id": "465fc2bf-5a4a-4965-b490-c0ddd2316467",
+			"createdAt": 1444451912.185
+		    }
+		],
+		"runningCount": 1
+	    }
+	],
+	"failures": []
+    }
+
+Now there's an event with the message "(service mysql-service) registered 1 instances in (elb mysql-elb)"
+which means that our MySQL service should now be available from within the url
+of the elb. Let's get the ELB url and then try to connect to the MySQL service from inside
+of one of our instances:
+
+    $ aws elb describe-load-balancers
+
+Output:
+
+    {
+	"LoadBalancerDescriptions": [
+	    {
+		"Subnets": [
+		    "subnet-39706b4e"
+		],
+		"CanonicalHostedZoneNameID": "Z3DZXE0Q79N41H",
+		"VPCId": "vpc-120cd476",
+		"ListenerDescriptions": [
+		    {
+			"Listener": {
+			    "InstancePort": 3306,
+			    "LoadBalancerPort": 80,
+			    "Protocol": "TCP",
+			    "InstanceProtocol": "TCP"
+			},
+			"PolicyNames": []
+		    }
+		],
+		"HealthCheck": {
+		    "HealthyThreshold": 10,
+		    "Interval": 30,
+		    "Target": "TCP:3306",
+		    "Timeout": 5,
+		    "UnhealthyThreshold": 2
+		},
+		"BackendServerDescriptions": [],
+		"Instances": [
+		    {
+			"InstanceId": "i-8372af57"
+		    }
+		],
+		"DNSName": "internal-mysql-elb-1700927984.us-east-1.elb.amazonaws.com",
+		"SecurityGroups": [
+		    "sg-c70ff2a1"
+		],
+		"Policies": {
+		    "LBCookieStickinessPolicies": [],
+		    "AppCookieStickinessPolicies": [],
+		    "OtherPolicies": []
+		},
+		"LoadBalancerName": "mysql-elb",
+		"CreatedTime": "2015-10-10T04:36:34.930Z",
+		"AvailabilityZones": [
+		    "us-east-1d"
+		],
+		"Scheme": "internal",
+		"SourceSecurityGroup": {
+		    "OwnerAlias": "387705308362",
+		    "GroupName": "default"
+		}
+	    }
+	]
+    }
+
+As you can see from this output, the dns for this load balancer is internal-mysql-elb-1700927984.us-east-1.elb.amazonaws.com
+and it has one instance attached.
+
+Let's connect to the same instance as before but this time let's try using the ELB dns
+for connecting to the MySQL server, this time using the port 80:
+
+    $ ssh -i ~/.ssh/keys/ClusterKeyPair.pem ec2-user@ec2-52-23-203-99.compute-1.amazonaws.com
+
+       __|  __|  __|
+       _|  (   \__ \   Amazon ECS-Optimized Amazon Linux AMI 2015.03.g
+     ____|\___|____/
+
+    For documentation visit, http://aws.amazon.com/documentation/ecs
+    No packages needed for security; 1 packages available
+    Run "sudo yum update" to apply all updates.
+    Amazon Linux version 2015.09 is available.
+    -bash: warning: setlocale: LC_CTYPE: cannot change locale (UTF-8): No such file or directory
+
+    $ mysql -h internal-mysql-elb-1700927984.us-east-1.elb.amazonaws.com -P 80 -usearchappusr -pmysecretpassword
+
+    Welcome to the MySQL monitor.  Commands end with ; or \g.
+    Your MySQL connection id is 7
+    Server version: 5.7.8-rc MySQL Community Server (GPL)
+
+    Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
+
+    Oracle is a registered trademark of Oracle Corporation and/or its
+    affiliates. Other names may be trademarks of their respective
+    owners.
+
+    Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+    mysql>
+
+Great! so we have our first service in place using our internal load balancer.
+For the rest of the tasks, the setup will be pretty similar, we have to register
+the task definitions, create a load balancer for each one and launch services
+attached to this load balancer. Once we have all of our dependencies running
+in their services, we can launch our main application and connect it to this
+services.
