@@ -1168,7 +1168,7 @@ If we wait a minute and describe the service using its Arn in the events section
 
 Now there's an event with the message "(service mysql-service) registered 1 instances in (elb mysql-elb)"
 which means that our MySQL service should now be available from within the url
-of the elb. Let's get the ELB url and then try to connect to the MySQL service from inside
+of the ELB. Let's get the ELB url and then try to connect to the MySQL service from inside
 of one of our instances:
 
     $ aws elb describe-load-balancers
@@ -1230,10 +1230,10 @@ Output:
 	]
     }
 
-As you can see from this output, the dns for this load balancer is internal-mysql-elb-1700927984.us-east-1.elb.amazonaws.com
+As you can see from this output, the DNS for this load balancer is internal-mysql-elb-1700927984.us-east-1.elb.amazonaws.com
 and it has one instance attached.
 
-Let's connect to the same instance as before but this time let's try using the ELB dns
+Let's connect to the same instance as before but this time let's try using the ELB DNS
 for connecting to the MySQL server, this time using the port 80:
 
     $ ssh -i ~/.ssh/keys/ClusterKeyPair.pem ec2-user@ec2-52-23-203-99.compute-1.amazonaws.com
@@ -1264,7 +1264,7 @@ for connecting to the MySQL server, this time using the port 80:
 
     mysql>
 
-Great! so we have our first service in place using our internal load balancer.
+Great!, we have our first service in place using our internal load balancer.
 For the rest of the tasks, the setup will be pretty similar, we have to register
 the task definitions, create a load balancer for each one and launch services
 attached to this load balancer. Once we have all of our dependencies running
@@ -1274,7 +1274,7 @@ services.
 ## More task definitions
 
 Now that we got the basics of the ECS workflow, let's register the task definitions
-for the remaning dependencies: elasticsearch, redis and memcached. All of this
+for the remaining dependencies: elasticsearch, redis and memcached. All of this
 services needs to run behind a ELB so our main app can discover the endpoints
 correctly.
 
@@ -1320,7 +1320,7 @@ The task definitions for elasticsearch is:
 	"family": "elasticsearch"
     }
 
-Pretty much the same as the MySQL task. We are using a volume for persisting the elasticsearc data, using 256 MiB
+Pretty much the same as the MySQL task. We are using a volume for persisting the elasticsearch data, using 256 MiB
 for memory, and 128 cpu units. The port mapping is 9200 from the container to 9200 on the instance. Let's register
 this task on our cluster:
 
