@@ -1,1 +1,26 @@
 # Setting up the project
+
+This is not a book about Ruby on Rails development, so we are not going to
+build an application from scratch. Instead, we're going to deploy an application
+obtainer from the [elasticsearch-rails gem repository](https://github.com/elastic/elasticsearch-rails/tree/master/elasticsearch-rails).
+This a fully working example of a Rails application that uses elasticsearch
+as a search engine.
+Our final application is going to look like this:
+
+![Complete Web Application](images/complete-app.png)
+
+It's basically a search application that has several articles from the New York Times
+which are persisted in a database and indexed in elasticsearch.
+This application is distributed in several Rails templates, and since we need
+to modify some things in order to dockerize the application, I've created a repository
+with the final application. I've justed some minor modifications so all the hooks
+with the dependencies are ready.
+
+First, clone the repository in your local machine:
+
+    git clone git@github.com:pacuna/searchapp.git
+
+Now you'll have access to all the necessary files for deploying the application
+with Amazon ECS. You'll find all this files in the deploy folder.
+
+
