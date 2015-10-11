@@ -31,3 +31,6 @@ to pull it from ECS.
 For pushing the images to DockerHub you'll need Docker installed on your machine. It doesn't
 matter is you are using native Docker, Vagrant, boot2docker, or Docker Toolbox. We just need
 Docker connected to your DockerHub account.
+
+Finally, you'll need the aws cli tool for accessing the Amazon AWS api.
+To setup this tool, you can visit [this link](https://aws.amazon.com/cli/)
