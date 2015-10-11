@@ -1,3 +1,29 @@
 # Preface
 
-In this sample Leanpub book we will show you how to write a Leanpub book.
+Containers are the new thing. After several years fighting for their place in the software development world, 
+Docker is now positioned as one of the most promising tendencies.
+    Using containers we can have a database server, a search engine or a web application, running in minutes.
+This has allowed to bring the system administration world closer to the developers, giving even more power
+to the new DevOps generation.
+
+Nevertheless, there are still some dark parts in the containers world. Specially in the deployment step of the 
+software development process. You'll find several technologies out there battling for taking this place. Of course
+Amazon Web Services couldn't be out of this battle and launched their service called Amazon EC2 Container Service.
+Using this service, it's possible to create production environments that are robust, safe and scalable without losing
+the power of the classic resources from AWS such as Elastic Load Balancing, Auto-Scaling, Security Groups, Virtual Private
+Cloud, etc.
+
+In this book I'll show you how to deploy a complex Ruby on Rails application provided by the 
+[elasticsearch-rails repository](https://github.com/elastic/elasticsearch-rails)
+as an example for connecting elasticsearch with Rails. We'll deploy this application using Amazon EC2 Container Service.
+this is not going to be a useless and non-realistic application, it's goint to have dependencies
+widely used in big applications out there. We'll connect our application with a MySQL database server, a search engine
+provided by ElasticSearch, Redis and Sidekiq for managing background jobs, and also a cache layer using Memcached.
+
+Since ECS is a new technology and it's constantly changing and improving, I've decided to show all the examples using
+the AWS command line interface. The main reason is that I believe that is more probable the UI from the Web console 
+changes that the Amazon API changes without maintaining backward compatibility. Also, this approach is much more useful if you
+decide to automatize part of these processes in the future.
+
+
+
