@@ -23,4 +23,11 @@ First, clone the repository in your local machine:
 Now you'll have access to all the necessary files for deploying the application
 with Amazon ECS. You'll find all this files in the deploy folder.
 
-
+You're also going to need an Amazon AWS account and a DockerHub account, so
+if you don't have one of those, now is the time to create it.
+Once you have your DockerHub account ready, create a new public repository and name it
+"youruser/searchapp". We are going to push our container images to that repository in order
+to pull it from ECS.
+For pushing the images to DockerHub you'll need Docker installed on your machine. It doesn't
+matter is you are using native Docker, Vagrant, boot2docker, or Docker Toolbox. We just need
+Docker connected to your DockerHub account.
