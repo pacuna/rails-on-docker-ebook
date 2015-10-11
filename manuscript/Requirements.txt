@@ -1,1 +1,16 @@
 # Requirements
+
+This book is for people that have a basic knowledge about Ruby on Rails, 
+Docker and Amazon Web Services. Is not necessary for experts, but there are some
+basic concepts I'm not going to spend time talking about them. If you don't
+the basics about AWS, I recommend you to go to the [getting started page](https://aws.amazon.com/getting-started/), 
+create an account and start playing with the web console.
+
+Some of the things that you'll need in order to follow the instructions:
+
+- A [GitHub](http://github.com) account and Git properly configured in your machine
+- An [AWS](https://aws.amazon.com) account
+- API credentials for your AWS account
+- the [aws cli](https://aws.amazon.com/cli) tool ready for use
+- [Docker](https://www.docker.com)
+- A [DockerHub](https://hub.docker.com) account
