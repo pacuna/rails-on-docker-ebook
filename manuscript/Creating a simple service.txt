@@ -1,10 +1,10 @@
 # Creating a simple service
 
-Now that we know that our task definition works properly, let's create
-a service scheduler for managing this task. 
-This service will be connected to the ELB that we created previously.
+Now that we know our task definition works properly, let's create
+a service scheduler for managing the task. 
+This service will be running behind the ELB that we created previously.
 
-If you list your current services you'll see an empty response:
+If you list your current services you'll get an empty array as response:
 
     $ aws ecs list-services --cluster searchapp
 
@@ -48,17 +48,17 @@ Output:
     }
 
 The create-service command just needs the cluster name, the service name, the
-task definition for running the task, and the desired count of tasks. If you
-choose more than 1 running tasks, the task will be allocated in more than one
+task definition for running the task with its revision number, and the desired count of tasks the service should run. If you
+choose more than 1 running tasks, the tasks will be allocated in more than one
 instance, which in our case make sense, since the task is using a fixed port
 on the instance (3306), so it's not possible to have more than one of this task
-running on one instace.
+running on one instance.
+
 You can let ECS to pick a random port for your task, but then you would no be
 able to create a service attached to an ELB, since the ELB needs a static port
-for its listener.
+for its listener configuration. This is a feature that a lot of people are waiting to be implemented.
 
-If you list your services again, you'll get the Arn for the service recently
-created:
+If you list your services again, you'll get the Arn for the service that we just created:
 
     $ aws ecs list-services --cluster searchapp
 
@@ -115,14 +115,14 @@ a service using its Arn identifier:
     }
 
 It's good to be familiarized with this kind of output, since later it's going to be
-very useful for troubleshooting issues with the service. The events section
-of the output tells us that the current state of the service and can show
+very useful for troubleshooting issues related to the service. The events section
+of the output tells us about the current state of the service and can display
 possible errors during the launch. Later we'll talk more about debugging issues.
 In our case, the service has started and has reached a steady state, which means
 there's no issues.
 
-So this is the most basic kind of service. Right now we need our service to
-be attached to the ELB for the MySQL server. For removing a service, first
+This is the most basic kind of service. Right now we need our service to
+be attached to the ELB for the MySQL server so let's remove this test service. For removing a service, first
 we have to update the desired count of tasks to zero:
 
     $ aws ecs update-service --cluster searchapp --service mysql-service --desired-count 0
