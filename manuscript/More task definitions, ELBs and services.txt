@@ -1,0 +1,490 @@
+# More task definitions, ELBs and Services
+
+Now that we got the basics of the ECS workflow, let's register the task definitions
+for the remaining dependencies: elasticsearch, redis and memcached. All of this
+services needs to run behind a ELB so our main app can discover the endpoints
+correctly.
+
+## Elasticsearch
+
+The task definitions for elasticsearch is:
+
+    {
+	"containerDefinitions": [
+	    {
+		"volumesFrom": [],
+		"memory": 256,
+		"portMappings": [
+		    {
+			"hostPort": 9200,
+			"containerPort": 9200,
+			"protocol": "tcp"
+		    }
+		],
+		"essential": true,
+		"entryPoint": [],
+		"mountPoints": [
+		    {
+			"containerPath": "/usr/share/elasticsearch/data",
+			"sourceVolume": "elasticsearch-data",
+			"readOnly": false
+		    }
+		],
+		"name": "searchapp-es",
+		"environment": [],
+		"links": [],
+		"image": "elasticsearch",
+		"command": [],
+		"cpu": 128
+	    }
+	],
+	"volumes": [
+	    {
+		"name": "elasticsearch-data"
+	    }
+	],
+	"family": "elasticsearch"
+    }
+
+Pretty much the same as the MySQL task. We are using a volume for persisting the elasticsearch data, using 256 MiB
+for memory, and 128 cpu units. The port mapping is 9200 from the container to 9200 on the instance. Let's register
+this task on our cluster:
+
+    $ aws ecs register-task-definition --cli-input-json file://task-definitions/elasticsearch.json
+
+Output:
+
+    {
+	"taskDefinition": {
+	    "status": "ACTIVE",
+	    "family": "elasticsearch",
+	    "volumes": [
+		{
+		    "host": {},
+		    "name": "elasticsearch-data"
+		}
+	    ],
+	    "taskDefinitionArn": "arn:aws:ecs:us-east-1:387705308362:task-definition/elasticsearch:1",
+	    "containerDefinitions": [
+		{
+		    "environment": [],
+		    "name": "searchapp-es",
+		    "links": [],
+		    "mountPoints": [
+			{
+			    "sourceVolume": "elasticsearch-data",
+			    "readOnly": false,
+			    "containerPath": "/usr/share/elasticsearch/data"
+			}
+		    ],
+		    "image": "elasticsearch",
+		    "essential": true,
+		    "portMappings": [
+			{
+			    "protocol": "tcp",
+			    "containerPort": 9200,
+			    "hostPort": 9200
+			}
+		    ],
+		    "entryPoint": [],
+		    "memory": 256,
+		    "command": [],
+		    "cpu": 128,
+		    "volumesFrom": []
+		}
+	    ],
+	    "revision": 1
+	}
+    }
+
+Now before we create the service let's add a new ELB for elasticsearch (remember to use your security group and subnet):
+
+
+    $ aws elb create-load-balancer --load-balancer-name elasticsearch-elb --listeners Protocol=TCP,LoadBalancerPort=80,InstanceProtocol=TCP,InstancePort=9200 --subnets subnet-39706b4e --scheme internal --security-groups sg-c70ff2a1
+
+Output:
+
+    {
+	"DNSName": "internal-elasticsearch-elb-907663077.us-east-1.elb.amazonaws.com"
+    }
+
+In this case we need to listen to the port 9200 on the instance.
+
+Now we can launch the service using the task definition and the load balancer. The json file for this service is:
+
+    {
+	"serviceName": "elasticsearch-service",
+	"taskDefinition": "elasticsearch:1",
+	"loadBalancers": [
+	    {
+		"loadBalancerName": "elasticsearch-elb",
+		"containerName": "searchapp-es",
+		"containerPort": 9200
+	    }
+	],
+	"desiredCount": 1,
+	"role": "ecsServiceRole"
+    }
+
+
+And we launched with:
+
+    $ aws ecs create-service --cluster searchapp --service-name elasticsearch-service --cli-input-json file://elasticsearch-service.json
+
+Output:
+
+    {
+	"service": {
+	    "status": "ACTIVE",
+	    "taskDefinition": "arn:aws:ecs:us-east-1:387705308362:task-definition/elasticsearch:1",
+	    "pendingCount": 0,
+	    "loadBalancers": [
+		{
+		    "containerName": "searchapp-es",
+		    "containerPort": 9200,
+		    "loadBalancerName": "elasticsearch-elb"
+		}
+	    ],
+	    "roleArn": "arn:aws:iam::387705308362:role/ecsServiceRole",
+	    "desiredCount": 1,
+	    "serviceName": "elasticsearch-service",
+	    "clusterArn": "arn:aws:ecs:us-east-1:387705308362:cluster/searchapp",
+	    "serviceArn": "arn:aws:ecs:us-east-1:387705308362:service/elasticsearch-service",
+	    "deployments": [
+		{
+		    "status": "PRIMARY",
+		    "pendingCount": 0,
+		    "createdAt": 1444488166.315,
+		    "desiredCount": 1,
+		    "taskDefinition": "arn:aws:ecs:us-east-1:387705308362:task-definition/elasticsearch:1",
+		    "updatedAt": 1444488166.315,
+		    "id": "ecs-svc/9223370592366609492",
+		    "runningCount": 0
+		}
+	    ],
+	    "events": [],
+	    "runningCount": 0
+	}
+    }
+
+If we follow the same procedure as before, discover in which instance the service is running and we try to reach
+the service, we get:
+
+    [ec2-user@ip-172-31-1-132 ~]$ curl localhost:9200
+    {
+      "status" : 200,
+      "name" : "Amanda Sefton",
+      "cluster_name" : "elasticsearch",
+      "version" : {
+	"number" : "1.7.2",
+	"build_hash" : "e43676b1385b8125d647f593f7202acbd816e8ec",
+	"build_timestamp" : "2015-09-14T09:49:53Z",
+	"build_snapshot" : false,
+	"lucene_version" : "4.10.4"
+      },
+      "tagline" : "You Know, for Search"
+    }
+
+Great, so we have that service ready.
+
+## Redis
+
+The task definition for redis is:
+
+
+    {
+	"containerDefinitions": [
+	    {
+		"volumesFrom": [],
+		"memory": 128,
+		"portMappings": [
+		    {
+			"hostPort": 6379,
+			"containerPort": 6379,
+			"protocol": "tcp"
+		    }
+		],
+		"essential": true,
+		"entryPoint": [],
+		"mountPoints": [],
+		"name": "searchapp-redis",
+		"environment": [],
+		"links": [],
+		"image": "redis",
+		"command": [],
+		"cpu": 128
+	    }
+	],
+	"volumes": [],
+	"family": "redis"
+    }
+
+In this case we're not mounting a volume and we are using less memory than the first two.
+The amount of memory and cpu units that you want to use for a task, it's probably going to be 
+the outcome of experimentation with your containers. Sometimes you'll launch a task with a less
+amount than the container really needs and the container process will be killed. So keep in mind
+that a typical failure can be produced for using the wrong amount of memory and/our cpu units.
+
+Let's register this task:
+
+    $ aws ecs register-task-definition --cli-input-json file://task-definitions/redis.json
+
+Output:
+
+    {
+	"taskDefinition": {
+	    "status": "ACTIVE",
+	    "family": "redis",
+	    "volumes": [],
+	    "taskDefinitionArn": "arn:aws:ecs:us-east-1:387705308362:task-definition/redis:1",
+	    "containerDefinitions": [
+		{
+		    "environment": [],
+		    "name": "searchapp-redis",
+		    "links": [],
+		    "mountPoints": [],
+		    "image": "redis",
+		    "essential": true,
+		    "portMappings": [
+			{
+			    "protocol": "tcp",
+			    "containerPort": 6379,
+			    "hostPort": 6379
+			}
+		    ],
+		    "entryPoint": [],
+		    "memory": 128,
+		    "command": [],
+		    "cpu": 128,
+		    "volumesFrom": []
+		}
+	    ],
+	    "revision": 1
+	}
+    }
+
+Create the ELB:
+
+    $ aws elb create-load-balancer --load-balancer-name redis-elb --listeners Protocol=TCP,LoadBalancerPort=80,InstanceProtocol=TCP,InstancePort=6379 --subnets subnet-39706b4e --scheme internal --security-groups sg-c70ff2a1
+
+Output:
+
+    {
+	"DNSName": "internal-redis-elb-124984907.us-east-1.elb.amazonaws.com"
+    }
+
+And launch the service using this json:
+
+
+    {
+	"serviceName": "redis-service",
+	"taskDefinition": "searchapp-redis:1",
+	"loadBalancers": [
+	    {
+		"loadBalancerName": "redis-elb",
+		"containerName": "searchapp-redis",
+		"containerPort": 6379
+	    }
+	],
+	"desiredCount": 1,
+	"role": "ecsServiceRole"
+    }
+
+Launch the service:
+
+    $ aws ecs create-service --cluster searchapp --service-name redis-service --cli-input-json file://redis-service.json
+
+Output:
+
+    {
+	"service": {
+	    "status": "ACTIVE",
+	    "taskDefinition": "arn:aws:ecs:us-east-1:387705308362:task-definition/redis:1",
+	    "pendingCount": 0,
+	    "loadBalancers": [
+		{
+		    "containerName": "searchapp-redis",
+		    "containerPort": 6379,
+		    "loadBalancerName": "redis-elb"
+		}
+	    ],
+	    "roleArn": "arn:aws:iam::387705308362:role/ecsServiceRole",
+	    "desiredCount": 1,
+	    "serviceName": "redis-service",
+	    "clusterArn": "arn:aws:ecs:us-east-1:387705308362:cluster/searchapp",
+	    "serviceArn": "arn:aws:ecs:us-east-1:387705308362:service/redis-service",
+	    "deployments": [
+		{
+		    "status": "PRIMARY",
+		    "pendingCount": 0,
+		    "createdAt": 1444489036.569,
+		    "desiredCount": 1,
+		    "taskDefinition": "arn:aws:ecs:us-east-1:387705308362:task-definition/redis:1",
+		    "updatedAt": 1444489036.569,
+		    "id": "ecs-svc/9223370592365739238",
+		    "runningCount": 0
+		}
+	    ],
+	    "events": [],
+	    "runningCount": 0
+	}
+    }
+
+Great, we just one more dependency service.
+
+## Memcached
+
+The task definition is pretty similar to the redis one:
+
+
+    {
+	"containerDefinitions": [
+	    {
+		"volumesFrom": [],
+		"memory": 128,
+		"portMappings": [
+		    {
+			"hostPort": 11211,
+			"containerPort": 11211,
+			"protocol": "tcp"
+		    }
+		],
+		"essential": true,
+		"entryPoint": [],
+		"mountPoints": [],
+		"name": "searchapp-memcached",
+		"environment": [],
+		"links": [],
+		"image": "memcached",
+		"command": [],
+		"cpu": 128
+	    }
+	],
+	"volumes": [],
+	"family": "memcached"
+    }
+
+Register the task:
+
+    $ aws ecs register-task-definition --cli-input-json file://memcached.json
+
+Output:
+
+    {
+	"taskDefinition": {
+	    "status": "ACTIVE",
+	    "family": "memcached",
+	    "volumes": [],
+	    "taskDefinitionArn": "arn:aws:ecs:us-east-1:387705308362:task-definition/memcached:1",
+	    "containerDefinitions": [
+		{
+		    "environment": [],
+		    "name": "searchapp-memcached",
+		    "links": [],
+		    "mountPoints": [],
+		    "image": "memcached",
+		    "essential": true,
+		    "portMappings": [
+			{
+			    "protocol": "tcp",
+			    "containerPort": 11211,
+			    "hostPort": 11211
+			}
+		    ],
+		    "entryPoint": [],
+		    "memory": 128,
+		    "command": [],
+		    "cpu": 128,
+		    "volumesFrom": []
+		}
+	    ],
+	    "revision": 1
+	}
+    }
+
+Create the ELB:
+
+    $ aws elb create-load-balancer --load-balancer-name memcached-elb --listeners Protocol=TCP,LoadBalancerPort=80,InstanceProtocol=TCP,InstancePort=11211 --subnets subnet-39706b4e --scheme internal --security-groups sg-c70ff2a1
+
+Output:
+
+    {
+	"DNSName": "internal-memcached-elb-47598939.us-east-1.elb.amazonaws.com"
+    }
+
+And launch a service using this json:
+
+
+    {
+	"serviceName": "memcached-service",
+	"taskDefinition": "memcached:1",
+	"loadBalancers": [
+	    {
+		"loadBalancerName": "memcached-elb",
+		"containerName": "searchapp-memcached",
+		"containerPort": 11211
+	    }
+	],
+	"desiredCount": 1,
+	"role": "ecsServiceRole"
+    }
+
+Create the service:
+
+    $ aws ecs create-service --cluster searchapp --service-name memcached-service --cli-input-json file://memcached-service.json
+
+Output:
+
+    {
+	"service": {
+	    "status": "ACTIVE",
+	    "taskDefinition": "arn:aws:ecs:us-east-1:387705308362:task-definition/memcached:1",
+	    "pendingCount": 0,
+	    "loadBalancers": [
+		{
+		    "containerName": "searchapp-memcached",
+		    "containerPort": 11211,
+		    "loadBalancerName": "memcached-elb"
+		}
+	    ],
+	    "roleArn": "arn:aws:iam::387705308362:role/ecsServiceRole",
+	    "desiredCount": 1,
+	    "serviceName": "memcached-service",
+	    "clusterArn": "arn:aws:ecs:us-east-1:387705308362:cluster/searchapp",
+	    "serviceArn": "arn:aws:ecs:us-east-1:387705308362:service/memcached-service",
+	    "deployments": [
+		{
+		    "status": "PRIMARY",
+		    "pendingCount": 0,
+		    "createdAt": 1444489403.347,
+		    "desiredCount": 1,
+		    "taskDefinition": "arn:aws:ecs:us-east-1:387705308362:task-definition/memcached:1",
+		    "updatedAt": 1444489403.347,
+		    "id": "ecs-svc/9223370592365372460",
+		    "runningCount": 0
+		}
+	    ],
+	    "events": [],
+	    "runningCount": 0
+	}
+    }
+
+And that's it for services for our dependencies. If you list your services you'll see the four service that
+we created:
+
+    $ aws ecs list-services --cluster searchapp
+
+Output:
+
+    {
+	"serviceArns": [
+	    "arn:aws:ecs:us-east-1:387705308362:service/memcached-service",
+	    "arn:aws:ecs:us-east-1:387705308362:service/elasticsearch-service",
+	    "arn:aws:ecs:us-east-1:387705308362:service/mysql-service",
+	    "arn:aws:ecs:us-east-1:387705308362:service/redis-service"
+	]
+    }
+
+Now we star with out Rails application that's going to connect with each one of this services using the
+internal ELBs that point to the services endpoints.
+

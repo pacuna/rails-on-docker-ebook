@@ -1,0 +1,225 @@
+# Creating a simple service
+
+Now that we know that our task definition works properly, let's create
+a service scheduler for managing this task. 
+This service will be connected to the ELB that we created previously.
+
+If you list your current services you'll see an empty response:
+
+    $ aws ecs list-services --cluster searchapp
+
+Output:
+
+    {
+	"serviceArns": []
+    }
+
+Let's create one for the MySQL task:
+
+    $ aws ecs create-service --cluster searchapp --service-name mysql-service --task-definition searchapp-db:1 --desired-count 1
+
+Output:
+
+    {
+	"service": {
+	    "status": "ACTIVE",
+	    "taskDefinition": "arn:aws:ecs:us-east-1:387705308362:task-definition/searchapp-db:1",
+	    "pendingCount": 0,
+	    "loadBalancers": [],
+	    "desiredCount": 1,
+	    "serviceName": "mysql-service",
+	    "clusterArn": "arn:aws:ecs:us-east-1:387705308362:cluster/searchapp",
+	    "serviceArn": "arn:aws:ecs:us-east-1:387705308362:service/mysql-service",
+	    "deployments": [
+		{
+		    "status": "PRIMARY",
+		    "pendingCount": 0,
+		    "createdAt": 1444447207.569,
+		    "desiredCount": 1,
+		    "taskDefinition": "arn:aws:ecs:us-east-1:387705308362:task-definition/searchapp-db:1",
+		    "updatedAt": 1444447207.569,
+		    "id": "ecs-svc/9223370592407568238",
+		    "runningCount": 0
+		}
+	    ],
+	    "events": [],
+	    "runningCount": 0
+	}
+    }
+
+The create-service command just needs the cluster name, the service name, the
+task definition for running the task, and the desired count of tasks. If you
+choose more than 1 running tasks, the task will be allocated in more than one
+instance, which in our case make sense, since the task is using a fixed port
+on the instance (3306), so it's not possible to have more than one of this task
+running on one instace.
+You can let ECS to pick a random port for your task, but then you would no be
+able to create a service attached to an ELB, since the ELB needs a static port
+for its listener.
+
+If you list your services again, you'll get the Arn for the service recently
+created:
+
+    $ aws ecs list-services --cluster searchapp
+
+    {
+	"serviceArns": [
+	    "arn:aws:ecs:us-east-1:387705308362:service/mysql-service"
+	]
+    }
+
+And you can run the describe-services command for get all the information for
+a service using its Arn identifier:
+
+    $ aws ecs describe-services --cluster searchapp --services arn:aws:ecs:us-east-1:387705308362:service/mysql-service
+
+    {
+	"services": [
+	    {
+		"status": "ACTIVE",
+		"taskDefinition": "arn:aws:ecs:us-east-1:387705308362:task-definition/searchapp-db:1",
+		"pendingCount": 0,
+		"loadBalancers": [],
+		"desiredCount": 1,
+		"serviceName": "mysql-service",
+		"clusterArn": "arn:aws:ecs:us-east-1:387705308362:cluster/searchapp",
+		"serviceArn": "arn:aws:ecs:us-east-1:387705308362:service/mysql-service",
+		"deployments": [
+		    {
+			"status": "PRIMARY",
+			"pendingCount": 0,
+			"createdAt": 1444447207.569,
+			"desiredCount": 1,
+			"taskDefinition": "arn:aws:ecs:us-east-1:387705308362:task-definition/searchapp-db:1",
+			"updatedAt": 1444447207.569,
+			"id": "ecs-svc/9223370592407568238",
+			"runningCount": 1
+		    }
+		],
+		"events": [
+		    {
+			"message": "(service mysql-service) has reached a steady state.",
+			"id": "13307911-f01a-44aa-bf79-b71ed2a9ca12",
+			"createdAt": 1444447226.492
+		    },
+		    {
+			"message": "(service mysql-service) has started 1 tasks: (task 8e710989-3ae2-40c5-a60b-258c12fbff47).",
+			"id": "08814d81-e268-4b5e-ad31-3c9cdd9658ab",
+			"createdAt": 1444447222.411
+		    }
+		],
+		"runningCount": 1
+	    }
+	],
+	"failures": []
+    }
+
+It's good to be familiarized with this kind of output, since later it's going to be
+very useful for troubleshooting issues with the service. The events section
+of the output tells us that the current state of the service and can show
+possible errors during the launch. Later we'll talk more about debugging issues.
+In our case, the service has started and has reached a steady state, which means
+there's no issues.
+
+So this is the most basic kind of service. Right now we need our service to
+be attached to the ELB for the MySQL server. For removing a service, first
+we have to update the desired count of tasks to zero:
+
+    $ aws ecs update-service --cluster searchapp --service mysql-service --desired-count 0
+
+Output
+
+    {
+	"service": {
+	    "status": "ACTIVE",
+	    "taskDefinition": "arn:aws:ecs:us-east-1:387705308362:task-definition/searchapp-db:1",
+	    "pendingCount": 0,
+	    "loadBalancers": [],
+	    "desiredCount": 0,
+	    "serviceName": "mysql-service",
+	    "clusterArn": "arn:aws:ecs:us-east-1:387705308362:cluster/searchapp",
+	    "serviceArn": "arn:aws:ecs:us-east-1:387705308362:service/mysql-service",
+	    "deployments": [
+		{
+		    "status": "PRIMARY",
+		    "pendingCount": 0,
+		    "createdAt": 1444447207.569,
+		    "desiredCount": 0,
+		    "taskDefinition": "arn:aws:ecs:us-east-1:387705308362:task-definition/searchapp-db:1",
+		    "updatedAt": 1444447207.569,
+		    "id": "ecs-svc/9223370592407568238",
+		    "runningCount": 1
+		}
+	    ],
+	    "events": [
+		{
+		    "message": "(service mysql-service) has reached a steady state.",
+		    "id": "13307911-f01a-44aa-bf79-b71ed2a9ca12",
+		    "createdAt": 1444447226.492
+		},
+		{
+		    "message": "(service mysql-service) has started 1 tasks: (task 8e710989-3ae2-40c5-a60b-258c12fbff47).",
+		    "id": "08814d81-e268-4b5e-ad31-3c9cdd9658ab",
+		    "createdAt": 1444447222.411
+		}
+	    ],
+	    "runningCount": 1
+	}
+    }
+
+After a minute, there will be no tasks running in the cluster. Let's delete the service:
+
+    $ aws ecs delete-service --cluster searchapp --service mysql-service
+
+Output:
+
+    {
+	"service": {
+	    "status": "DRAINING",
+	    "taskDefinition": "arn:aws:ecs:us-east-1:387705308362:task-definition/searchapp-db:1",
+	    "pendingCount": 0,
+	    "loadBalancers": [],
+	    "desiredCount": 0,
+	    "serviceName": "mysql-service",
+	    "clusterArn": "arn:aws:ecs:us-east-1:387705308362:cluster/searchapp",
+	    "serviceArn": "arn:aws:ecs:us-east-1:387705308362:service/mysql-service",
+	    "deployments": [
+		{
+		    "status": "PRIMARY",
+		    "pendingCount": 0,
+		    "createdAt": 1444447207.569,
+		    "desiredCount": 0,
+		    "taskDefinition": "arn:aws:ecs:us-east-1:387705308362:task-definition/searchapp-db:1",
+		    "updatedAt": 1444447949.667,
+		    "id": "ecs-svc/9223370592407568238",
+		    "runningCount": 0
+		}
+	    ],
+	    "events": [
+		{
+		    "message": "(service mysql-service) has reached a steady state.",
+		    "id": "258def28-8811-4b4d-a007-e15faba24618",
+		    "createdAt": 1444447968.859
+		},
+		{
+		    "message": "(service mysql-service) stopped 1 running tasks.",
+		    "id": "09237224-5800-4a96-ad48-fc078e216cde",
+		    "createdAt": 1444447965.169
+		},
+		{
+		    "message": "(service mysql-service) has reached a steady state.",
+		    "id": "13307911-f01a-44aa-bf79-b71ed2a9ca12",
+		    "createdAt": 1444447226.492
+		},
+		{
+		    "message": "(service mysql-service) has started 1 tasks: (task 8e710989-3ae2-40c5-a60b-258c12fbff47).",
+		    "id": "08814d81-e268-4b5e-ad31-3c9cdd9658ab",
+		    "createdAt": 1444447222.411
+		}
+	    ],
+	    "runningCount": 0
+	}
+    }
+
+The status of the service has changed to draining, which means that is going
+to dissapear from the cluster.
