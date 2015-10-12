@@ -1,7 +1,7 @@
 # Running the task
 
-Let's run this task just for checking out if everything's ok. First we are going
-to make sure that the mysql that we just registered is actually on our task definitions
+Let's run this task just to check if everything's ok. First we have to be
+sure that the MySQL task definition that we registered is actually on our task definitions
 list:
 
     $ aws ecs list-task-definitions
@@ -14,8 +14,8 @@ Output:
 	]
     }
 
-Great, so let's run a task using this task definition.
-You can run the task without a service with the following command:
+Good, so let's run a task using this task definition.
+You can run a task without a service using the following command:
 
     $ aws ecs run-task --cluster searchapp --task-definition searchapp-db:1
 
@@ -50,7 +50,10 @@ Output:
 	]
     }
 
-For polling the status of the task, we are going to need its amazon arn identifier.
+The only parameter is the task-definition name, follow by a semicolon and follow by the revision number
+that we want to deploy. Every time you register a new version of this task, the revision number will increment in one.
+
+For polling the status of the task, we need its Arn identifier.
 We can get the running tasks with
 
     $ aws ecs list-tasks --cluster searchapp
@@ -63,8 +66,8 @@ Output:
 	]
     }
 
-The output contains just the Arn of the only task that we have launched. So
-let's get more information using that Arn:
+The output contains just the Arn of the task that we just launched. We can get
+more information using that Arn:
 
     $ aws ecs describe-tasks --cluster searchapp --tasks arn:aws:ecs:us-east-1:387705308362:task/99f26c75-b7f6-4f3c-a126-0d6b14684160
 
@@ -108,27 +111,27 @@ Output:
 	]
     }
 
-The output is giving us a full report about our tasks. We know that's running, so we can assume
-that the docker image wall pulled and run correctly, we know the Arn of the
+The output is giving us a full report about our tasks. We know that this task is running, so we can assume
+that the docker image was pulled and run correctly, we know the Arn of the
 container Instance in which the task was launched,  and that the task is mapping the
 port 3306 of the container, with the port 3306 of the EC2 instance.
 
 Now, how can we know that the MySQL server is ready and waiting for connections?
 Well, all these resources are being launched using the default vpc security group, 
-which means that the resources have no restricted traffic access inside of the security
-group. Let's ssh into our of our instances and see if we can connect to the MySQL
+which means that the resources have no restricted traffic access between resources inside of the security
+group. Let's ssh into our of our instances and see if we can get a connection with the MySQL
 server.
 
-Let's try with the same instance that's running the task. Let's get more info
+We'll try with the same instance that's running the task. Let's get more information
 about this instance using its Arn:
 
     $ aws ecs describe-container-instances --cluster searchapp --container-instances arn:aws:ecs:us-east-1:387705308362:container-instance/52b56eb8-2657-45cb-8cb3-5fdcd008f162
 
-If look out the output, you'll find a section that contains the instance id:
+If you inspect the output, you'll find a section that contains the instance id:
 
     "ec2InstanceId": "i-8272af56"
 
-With that id you can get the public ip address of the instance using the ec2 api:
+With that id we can get the public ip address of the instance using the ec2 api:
 
     $ aws ec2 describe-instances --instance-ids i-8272af56
 
@@ -159,8 +162,9 @@ If I try to connect to the MySQL server from my local machine, it will fail, sin
 my ip is not in the vpc range. But we can ssh into the machine and try from there.
 
 In order to connect to the machine via ssh, we have to add a rule to the security group, 
-so the 22 port can be accessed from our ip. Remember to change the group-id with yours
-and the cird ip part with your local ip address.
+so the 22 port can be accessed from our ip. Remember to change the group-id with your default security group id of
+your vpc and the cird ip part with your local ip address. With this rule we can connect to the
+instances just from our network. If you want to grant access from anywhere, use 0.0.0.0/0.
 
     $ aws ec2 authorize-security-group-ingress --group-id sg-c70ff2a1 --protocol tcp --port 22 --cidr 190.101.5.80/24
 
@@ -195,15 +199,13 @@ Output:
     fd8e52ad8b34        mysql:5.7                        "/entrypoint.sh mysq   6 minutes ago       Up 6 minutes        0.0.0.0:3306->3306/tcp       ecs-searchapp-db-1-searchapp-db-bc97e9d6f3bff4cba801
     aadddba8536d        amazon/amazon-ecs-agent:latest   "/agent"               13 minutes ago      Up 13 minutes       127.0.0.1:51678->51678/tcp   ecs-agent
 
-So as expected, the mysql container is running, and also the amazon-ecs-agent.
-Let's see if we can connect to the MySQL service from this machine. For that
+So as expected, the mysql container is running next to the amazon-ecs-agent.
+Let's see if we can connect to MySQL from this machine. For that
 we are going to have to install the MySQL client first:
 
-    # change to root user
     $ sudo su
     $ yum install mysql 
     $ exit
-    # back to ec2-user
     $ mysql -h ec2-52-23-203-99.compute-1.amazonaws.com -usearchappusr -pmysecretpassword
 
 Output:
@@ -223,12 +225,12 @@ Output:
     mysql>
 
 
-Nice! we were able to connect the MySQL server using the credentials that we
+Nice! we were able to connect to the MySQL server using the credentials that we
 declared in the mysql task definition. The other instance registered in the cluster
 is also in the vpc default security group, so it should be able to connect to this
 server.
 
-But, we want to run this task using a service scheduler and attach the service
+But, now we want to run this task using a service scheduler and attach the service
 to a load balancer, so let's stop this task using its Arn:
 
     $ aws ecs stop-task --cluster searchapp --task arn:aws:ecs:us-east-1:387705308362:task/99f26c75-b7f6-4f3c-a126-0d6b14684160
