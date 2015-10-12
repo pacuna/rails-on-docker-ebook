@@ -15,3 +15,4 @@ Creating a complex service.txt
 More task definitions, ELBs and services.txt
 The main application.txt
 Setting up the CI Environment.txt
+Troubleshooting.txt
