@@ -2,11 +2,12 @@
 
 ## MySQL
 
-The task definition will contain the information of the container that you
-will run. You can create the task definition using json format, and the register 
+A task definition contains the information about the container that you
+want to run. You can create the task definition using a json file, and then register 
 the task in your cluster using the aws cli.
-You can find all the task defitions used in this book in the deploy/task-definitions
-directory of the source code repository.
+
+You can find all the task definitions used in this book in the deploy/task-definitions
+directory of the source code.
 
     {
 	"containerDefinitions": [
@@ -63,20 +64,24 @@ directory of the source code repository.
     }
 
 This template might look complicated, but there's a lot of irrelevant information
-there. Actually, if you use the ECS console for registering task definitions, you'll
-see that most of the information can be ommited. 
-If you have used docker-compose in the past, you'll see some similaties between
-the structure of the definition. Here you also have port mapping, environment
-variables, links with other containers, and volumes for persisting container data.
+there. Actually, if you use the ECS web console UI for registering task definitions, you'll
+see that most of the container information can be omitted. 
+
+![Creating a task definition via ECS web console](images/add-task-definition.png)
+
+If you used docker-compose in the past, you'll see some similarities between
+the structures of the definitions. Here you also have port mapping, environment
+variables, links with other containers and volumes for persisting the container data.
+
 This task is mapping the port 3306 to the host, declaring the environment variables
-that the mysql image requires, and creating a volume for mounting the /var/lib/mysql
-directory. This approach will allow us to avoid data lost when the mysql container
-is restarted. The problem is that we are now coupled to an particular instance, since
+that the [MySQL image](https://hub.docker.com/_/mysql) requires, and creating a volume for mounting the /var/lib/mysql
+directory. This approach will allow us to avoid data lost when the MySQL container
+is restarted. The problem is that we are now coupled to a particular instance, since
 ECS doesn't sync the data between instances. This is still a dark area in the containers
-world and it's why some people prefer to run only stateless application on containers
+world and it's why some people prefer to run only stateless application inside containers
 and use more typical approaches for their database resources.
 
-The command for register this task in our cluster is:
+The command for register this task definition in our cluster is:
 
 	$ aws ecs register-task-definition --cli-input-json file://task-definitions/mysql.json
 
@@ -142,16 +147,17 @@ Output:
 	    }
 	}
 
-Great, our task was created successfully. Now every time we make changes
-to this taks, a new revision will be created as long as we use the same
+Great, our task definition was registered successfully. Now every time we make changes
+to this definition, a new revision will be created as long as we use the same
 family value when registering the new json file.
-Also, now we can run a service scheduler for running a task using this task definition.
+
+Also, now we can create a service scheduler for running a task using this task definition.
 The service will be in charge of allocating the task somewhere in the cluster and
-restarting the task if the container fail for some reason.
+restarting the task if the container fails for some reason.
 Since the service associated with this task will deploy the container anywhere
 in the cluster, we need some mechanism for getting some static value that will
-point to the task, in this case the mysql server. The native way to accomplish
+point to the task, in this case to the MYSQL server endpoint. The native way to accomplish
 this in ECS is to create an Elastic Load Balancer and then when you define the service
-you can add an option for attaching it to the ELB. This way, even is the service
+you can add an option that attaches the service to the ELB. This way, even if the service
 allocates the task in a different instance between deploys, it will always be
 attached to the ELB.
