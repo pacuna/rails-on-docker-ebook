@@ -1,15 +1,15 @@
 # Creating a complex service
 
 The simple service created in the previous section was enough for catching
-the essentials of the workflow in ECS. You create your task definition, create
+the essentials of the workflow in ECS. You create your task definition,
 a service that runs that task, when you don't need the task running anymore you
-update the desired-count of the service, and finally you can remove the service.
+update the desired-count of tasks for the service, and finally you remove the service.
 
-Now, let's create a service connected to the ELB. For this case we are going to
-need a json file with the structure of the service. This is a good thing since now
+Now, let's create a service connected to the ELB. In this case we are going to
+need a json file with the definition of the service. This is a good thing since now
 we can add our task definitions and our services definitions to our version control system.
-We're also going to need a new IAM Role, since this service requires more interaction
-with our resources, specially with the instances and ELBs. We can later use this
+We're also going to need a new IAM Role, since this kind of service requires more interaction
+with other resources, especially with the EC2 instances and the ELBs. We can later use this
 same Role for the other services that we need.
 
 Use the file deploy/AmazonEC2ContainerServiceRole-Trust-Policy.json for the trust
@@ -39,7 +39,7 @@ Output:
 	}
     }
 
-And we need to attach the AmazonEC2ContainerServiceRole policy to this Role:
+Attach the Amazon provided AmazonEC2ContainerServiceRole policy to this Role:
 
     $ aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceRole --role-name ecsServiceRole
 
@@ -59,7 +59,7 @@ Now that we have the Role, the json for the service should look like this (deplo
 		"role": "ecsServiceRole"
     }
 
-And we create the service passing this file to the command (make sure you have the right path
+And we create the service using this file as argument for the command (make sure you have the right path
 for the json file):
 
     $ aws ecs create-service --cluster searchapp --service-name mysql-service --cli-input-json file://mysql-service.json
@@ -110,7 +110,7 @@ Output:
 	}
     }
 
-If we wait a minute and describe the service using its Arn in the events section we'll get:
+If we wait a minute and describe the service using its Arn, we'll get:
 
     $ aws ecs describe-services --cluster searchapp --services arn:aws:ecs:us-east-1:387705308362:service/mysql-service
 
@@ -169,8 +169,8 @@ If we wait a minute and describe the service using its Arn in the events section
     }
 
 Now there's an event with the message "(service mysql-service) registered 1 instances in (elb mysql-elb)"
-which means that our MySQL service should now be available from within the url
-of the ELB. Let's get the ELB url and then try to connect to the MySQL service from inside
+which means that our MySQL service should now be available using the ELB url. 
+Let's get the ELB dns and then try to connect to the MySQL service from inside
 of one of our instances:
 
     $ aws elb describe-load-balancers
@@ -235,7 +235,7 @@ Output:
 As you can see from this output, the DNS for this load balancer is internal-mysql-elb-1700927984.us-east-1.elb.amazonaws.com
 and it has one instance attached.
 
-Let's connect to the same instance as before but this time let's try using the ELB DNS
+Let's connect to the same instance as before but this time let's try using the ELB dns
 for connecting to the MySQL server, this time using the port 80:
 
     $ ssh -i ~/.ssh/keys/ClusterKeyPair.pem ec2-user@ec2-52-23-203-99.compute-1.amazonaws.com
@@ -267,8 +267,9 @@ for connecting to the MySQL server, this time using the port 80:
     mysql>
 
 Great!, we have our first service in place using our internal load balancer.
+
 For the rest of the tasks, the setup will be pretty similar, we have to register
 the task definitions, create a load balancer for each one and launch services
-attached to this load balancer. Once we have all of our dependencies running
-in their services, we can launch our main application and connect it to this
+attached to that load balancer. Once we have all of our dependencies running
+in their services, we can launch our main application and connect it to those
 services.
