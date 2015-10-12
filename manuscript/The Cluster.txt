@@ -2,7 +2,7 @@
 
 ## Creating the cluster
 
-Let's star by creating the central piece in the ECS architecture, the cluster.
+Let's start by creating the central piece in the ECS architecture, the cluster.
 We can create the cluster using one simple command. The only parameter
 that we need is the name:
 
