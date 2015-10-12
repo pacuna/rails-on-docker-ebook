@@ -5,6 +5,7 @@ mainmatter:
 Requirements.txt
 Setup.txt
 ECS basic concepts.txt
+AWS CLI reference.txt
 The Cluster.txt
 Our first task definition.txt
 Our first ELB.txt
@@ -13,3 +14,4 @@ Creating a simple service.txt
 Creating a complex service.txt
 More task definitions, ELBs and services.txt
 The main application.txt
+Setting up the CI Environment.txt

@@ -1,4 +1,4 @@
-# The main application
+# The Main Application
 
 The only extra attributes that the task definition for our web application is going to have, are several
 environment variables that the container needs for connecting with all the other services. So for example
