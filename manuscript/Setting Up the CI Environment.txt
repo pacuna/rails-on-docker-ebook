@@ -1,1 +1,233 @@
 # Setting up the CI Environment
+
+## Testing our application
+
+Our application comes with a testing suite ready. I fixed some minor issues
+that I founded running the tests, so you should be able to run them with
+no problems.
+
+It's important to always use RAILS_ENV=test when runnin the test suite.
+That's because the phusion passenger image overrides this variable using the one
+that you passed when running the container. This way, in development, it's
+always going to be development, even if in your test helper you declare that you want
+to use test. 
+
+With that being said, you can run the test suite by using:
+
+    RAILS_ENV=test rake
+
+Output:
+
+    root@8114b51c8ae3:/home/app/webapp# RAILS_ENV=test rake
+    Run options: --seed 36129
+
+    # Running:
+
+    .......................................
+
+    Finished in 4.600963s, 8.4765 runs/s, 19.9958 assertions/s.
+
+    39 runs, 92 assertions, 0 failures, 0 errors, 0 skips
+
+## Installing Docker
+
+Our CI environment will be powered by Jenkins. We'll use Jenkins for building
+our testing and production images, pushing the production image to DockerHub
+and finally to ECS. We are going to use a couple of Jenkins plugins for some of these steps.
+
+So, assuming that you have an installation of Jenkins (if not, you can
+find a lot of tutorials out there of how to install Jenkins on EC2).
+
+First we need to install docker in your machine. You can use the package manager
+of your Linux distribution or download the binaries from the Docker website.
+In my case I'm running the the Amazon Linux ami, so I can use yum to install docker:
+
+    # yum update -y
+    # yum install -y docker
+
+Let's add the jenkins user to the docker group. This will allow jenkins
+to push the images to DockerHub.
+
+    # usermod -a -G docker jenkins
+
+Now we can start the docker service and make them available after a reboot:
+
+    # service docker start
+    # chkconfig docker on
+
+## Installing the plugins
+
+First, search and install the following plugins:
+
+    - CloudBees Docker Build and Publish plugin
+    - CloudBees Docker Hub Notification
+    - Github plugin
+
+Remember to restart Jenkins after the installation.
+
+With these 3 plugis we can pull the source from our GitHub account, build
+the Docker image and push it to DockerHub. Then, with some shell magic, we'll
+update the ECS task definitions and the service. This way we are going to be able
+to deploy to production with just a push to the master branch (or the one you choose).
+
+## Installing the aws cli
+
+We will be sending some requests to the Amazon ECS api in order to register
+the updated task definitions and for update the services. So we are going to need
+the aws cli tool in the Jenkins server and add the credentials to the aws configuration.
+
+Once you installed the aws cli, run aws configure an add your API credentiales.
+You can obtain these using the web console.
+
+    # sudo -su jenkins
+    > aws configure
+
+## Login to DockerHub
+
+Jenkins also needs permission to push the images to DockerHub, so you have to
+login with your credentials using docker login.
+
+    # docker login
+
+## Creating the project
+
+Go to "create new Job" and select Freestyle project. Use the any name that you like
+for your project:
+
+![Jenkins Freestyle project](images/freestyle-project.png)
+
+Next, in the configuration project, add the url to your GitHub repository
+that contains the project:
+
+![GitHub Repo configuration](images/jenkins-config-1.png)
+
+Under the Source Code Management Section, select git and add your credentials
+using the credentials field. Use the branch that you like to deploy:
+
+![GitHub Repo configuration 2](images/jenkins-config-2.png)
+
+In the Build Triggers section, select "Build when a change is pushed to GitHub"
+
+![Jenkins configuration](images/jenkins-config-3.png)
+
+In the Build section, select Docker Build And Publish and use this
+parameters:
+
+![Docker Build And Publish](images/jenkins-config-4.png)
+
+Remember to change the username of the DockerHub repo.
+
+This build no needs to be pushed since is just going to be for running the
+test suite. If the tests passed, then we build the image that's going to
+be pushed to DockerHub and finally into Amazon ECS.
+
+## Running the tests
+
+Add another build step, but this time select "Execute Shell" and add the following
+command:
+
+![Shell command](images/jenkins-config-5.png)
+
+This command will execute a file that's in the deploy folder. Let's checkout
+the script:
+
+    #!/bin/bash
+    docker pull mysql:5.7
+    docker pull elasticsearch
+    docker pull redis
+    docker run --name mysql -e MYSQL_ROOT_PASSWORD=secretpassword -d mysql:5.7
+    docker run --name elasticsearch -d elasticsearch
+    docker run --name redis -d redis
+
+    sleep 15s
+    docker run --name searchapp-test -e PASSENGER_APP_ENV=test --link mysql:db --link elasticsearch:es --link redis:redis --entrypoint="./deploy/run_tests.sh" -t pacuna/searchapp:test_v_${BUILD_NUMBER} | perl -pe '/Tests failed./ && `echo -n "Tests failed" > tests-failed-flag`'
+    if [ ! -f tests-failed-flag ]; then
+      echo -e "Tests passed."
+    else
+      echo -e "Build failed since tests failed."
+      rm tests-failed-flag
+      echo 'removing test containers'
+      docker rm -f searchapp-test
+      docker rm -f mysql
+      docker rm -f elasticsearch
+      docker rm -f redis
+      exit 1
+    fi
+    echo 'removing test containers'
+    docker rm -f searchapp-test
+    docker rm -f mysql
+    docker rm -f elasticsearch
+    docker rm -f redis
+
+This command sequence is actually pretty simple. First we pull the necessary
+dependencies for the test suite, which are mysql, elasticsearch and redis.
+Then we run containers for each one of these dependencies.
+The sleep command is just for give the containers some time for start before
+we can link them with our application. Then we run our application that
+was previously pulled from the GitHub repository. We pass the phusion passenger
+environment variable and we create links with the other containers. We also
+pass a custom entrypoint which is just a simple script for setting up the test database and 
+running the tests. The script also send the exit code so we can know if the tests failed or not.
+
+    #!/bin/bash
+    echo 'creating test database...'
+    RAILS_ENV=test rake db:create
+    echo 'migrating test database...'
+    RAILS_ENV=test rake db:migrate
+    echo 'running tests...'
+    RAILS_ENV=test rake
+
+    return_code=$?
+    if [[ $return_code != 0 ]] ; then
+      echo -e "Tests failed."
+      exit $return_code
+    fi
+
+
+Click apply and save.
+
+Now if you build the project and inspect the console output you'll see that jenkins
+is going to pull the code from GitHub, build the searchapp-test image and
+run the script. 
+
+Finally you should see something like this:
+
+![Test results](images/test-results.png)
+
+Great, that means that build step will block or allow the CI pipeline
+depending on the test results. 
+Now we have to create a new step for build the image that will be pushed
+to DockerHub.
+
+## Pushing to DockerHub
+
+Same way as before, in the configuration of the project, add a new Docker build
+and publish step but time, don't use test in the tag and don't skip push. 
+
+![Pushing to DockerHub](images/pushing-to-dockerhub.png)
+
+Once you have that, create another execute shell build step and the following line:
+
+    ./deploy/update_service.sh
+
+![Shell command](images/jenkins-config-6.png)
+
+Finally we need a build step for cleaning up the old images. If you don't add
+this step, you'll ended up with a lot of unused images on your jenkins server.
+Add the following line in a shell execution step:
+
+    ./deploy/clean_images.sh
+
+![Clean images](images/jenkins-config-7.png)
+
+And click apply and save.
+
+## Adding another EC2 instance
+
+Right now we have a cluster with 2 t2.micro EC2 instances. We are
+going to need one more. So let's run our command for creating another
+instance. Remember to use your security group and subnet ids:
+
+
+    $ aws ec2 run-instances --image-id ami-4fe4852a --count 1 --instance-type t2.micro --key-name ClusterKeyPair --security-group-ids sg-c70ff2a1 --subnet-id subnet-39706b4e  --iam-instance-profile Arn=arn:aws:iam::387705308362:instance-profile/ecsInstanceRole --associate-public-ip-address --user-data file://user-data/user-data.sh
+
