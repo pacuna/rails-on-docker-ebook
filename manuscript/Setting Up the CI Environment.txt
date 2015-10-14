@@ -2,15 +2,15 @@
 
 ## Testing our application
 
-Our application comes with a testing suite ready. I fixed some minor issues
-that I founded running the tests, so you should be able to run them with
+Our application has already a nice set of tests. I fixed some minor issues
+that I found running the tests, so you should be able to run them with
 no problems.
 
-It's important to always use RAILS_ENV=test when runnin the test suite.
+It's important to always use `RAILS_ENV=test` when running the test suite.
 That's because the phusion passenger image overrides this variable using the one
-that you passed when running the container. This way, in development, it's
-always going to be development, even if in your test helper you declare that you want
-to use test. 
+that you pass when you run the container. This way, in development, it's
+always going to be development, even if you declare that you want
+to use the test environment in your test helper. 
 
 With that being said, you can run the test suite by using:
 
@@ -36,17 +36,18 @@ our testing and production images, pushing the production image to DockerHub
 and finally to ECS. We are going to use a couple of Jenkins plugins for some of these steps.
 
 So, assuming that you have an installation of Jenkins (if not, you can
-find a lot of tutorials out there of how to install Jenkins on EC2).
+find a lot of tutorials out there for installing Jenkins on EC2). I prefer to run
+Jenkins in a regular server instead of containers just because I think is not necessary
+to add that complexity (run containers inside containers).
 
 First we need to install docker in your machine. You can use the package manager
-of your Linux distribution or download the binaries from the Docker website.
-In my case I'm running the the Amazon Linux ami, so I can use yum to install docker:
+of your EC2 Linux distribution or download the binaries from the Docker website.
+In my case I'm running the Amazon Linux ami, so I can use yum to install docker:
 
     # yum update -y
     # yum install -y docker
 
-Let's add the jenkins user to the docker group. This will allow jenkins
-to push the images to DockerHub.
+Let's add the jenkins user to the docker group:
 
     # usermod -a -G docker jenkins
 
@@ -57,7 +58,7 @@ Now we can start the docker service and make them available after a reboot:
 
 ## Installing the plugins
 
-First, search and install the following plugins:
+In the Jenkins plugin manager, search and install the following plugins:
 
     - CloudBees Docker Build and Publish plugin
     - CloudBees Docker Hub Notification
@@ -65,7 +66,7 @@ First, search and install the following plugins:
 
 Remember to restart Jenkins after the installation.
 
-With these 3 plugis we can pull the source from our GitHub account, build
+With these 3 plugins we can pull the source code from our GitHub account, build
 the Docker image and push it to DockerHub. Then, with some shell magic, we'll
 update the ECS task definitions and the service. This way we are going to be able
 to deploy to production with just a push to the master branch (or the one you choose).
@@ -74,10 +75,10 @@ to deploy to production with just a push to the master branch (or the one you ch
 
 We will be sending some requests to the Amazon ECS api in order to register
 the updated task definitions and for update the services. So we are going to need
-the aws cli tool in the Jenkins server and add the credentials to the aws configuration.
+the aws cli tool on the Jenkins server and add the credentials to the aws configuration.
 
-Once you installed the aws cli, run aws configure an add your API credentiales.
-You can obtain these using the web console.
+Once you installed the aws cli, run `aws configure` an add your API credentials.
+You can obtain these using the web console in your AWS account.
 
     # sudo -su jenkins
     > aws configure
@@ -85,24 +86,23 @@ You can obtain these using the web console.
 ## Login to DockerHub
 
 Jenkins also needs permission to push the images to DockerHub, so you have to
-login with your credentials using docker login.
+login with your DockerHub credentials using docker login.
 
     # docker login
 
 ## Creating the project
 
-Go to "create new Job" and select Freestyle project. Use the any name that you like
-for your project:
+Go to "create new Job" and select Freestyle project. Choose a name for your project.
 
 ![Jenkins Freestyle project](images/freestyle-project.png)
 
-Next, in the configuration project, add the url to your GitHub repository
+Next, in the project configuration, add the url to the GitHub repository
 that contains the project:
 
 ![GitHub Repo configuration](images/jenkins-config-1.png)
 
-Under the Source Code Management Section, select git and add your credentials
-using the credentials field. Use the branch that you like to deploy:
+Under the Source Code Management Section, select git and add your credentials.
+Use the branch that you like to deploy:
 
 ![GitHub Repo configuration 2](images/jenkins-config-2.png)
 
@@ -110,16 +110,15 @@ In the Build Triggers section, select "Build when a change is pushed to GitHub"
 
 ![Jenkins configuration](images/jenkins-config-3.png)
 
-In the Build section, select Docker Build And Publish and use this
-parameters:
+In the Build section, select Docker Build And Publish and use these parameters:
 
 ![Docker Build And Publish](images/jenkins-config-4.png)
 
-Remember to change the username of the DockerHub repo.
+Remember to change the username of the DockerHub repository.
 
-This build no needs to be pushed since is just going to be for running the
-test suite. If the tests passed, then we build the image that's going to
-be pushed to DockerHub and finally into Amazon ECS.
+This docker build doesn't need to be pushed since it's going to be just for running the
+test suite. If the tests pass, then we build the image that's going to
+be pushed to DockerHub and finally to ECS.
 
 ## Running the tests
 
@@ -128,7 +127,7 @@ command:
 
 ![Shell command](images/jenkins-config-5.png)
 
-This command will execute a file that's in the deploy folder. Let's checkout
+This will execute a file that's in the deploy folder. Let's checkout
 the script:
 
     #!/bin/bash
@@ -162,12 +161,12 @@ the script:
 This command sequence is actually pretty simple. First we pull the necessary
 dependencies for the test suite, which are mysql, elasticsearch and redis.
 Then we run containers for each one of these dependencies.
-The sleep command is just for give the containers some time for start before
+The sleep command is just for give the containers some time to start before
 we can link them with our application. Then we run our application that
 was previously pulled from the GitHub repository. We pass the phusion passenger
-environment variable and we create links with the other containers. We also
+environment variable and create links with the other containers. We also
 pass a custom entrypoint which is just a simple script for setting up the test database and 
-running the tests. The script also send the exit code so we can know if the tests failed or not.
+running the tests. The script also outputs the exit code so we can know if the tests failed or not.
 
     #!/bin/bash
     echo 'creating test database...'
@@ -194,7 +193,7 @@ Finally you should see something like this:
 
 ![Test results](images/test-results.png)
 
-Great, that means that build step will block or allow the CI pipeline
+Great, that means that the shell build step will block or allow the CI pipeline to continue
 depending on the test results. 
 Now we have to create a new step for build the image that will be pushed
 to DockerHub.
@@ -202,11 +201,11 @@ to DockerHub.
 ## Pushing to DockerHub
 
 Same way as before, in the configuration of the project, add a new Docker build
-and publish step but time, don't use test in the tag and don't skip push. 
+and publish step but time don't skip the push. 
 
 ![Pushing to DockerHub](images/pushing-to-dockerhub.png)
 
-Once you have that, create another execute shell build step and the following line:
+Now, create another execute shell build step and the following line:
 
     ./deploy/update_service.sh
 
@@ -228,6 +227,82 @@ Right now we have a cluster with 2 t2.micro EC2 instances. We are
 going to need one more. So let's run our command for creating another
 instance. Remember to use your security group and subnet ids:
 
-
     $ aws ec2 run-instances --image-id ami-4fe4852a --count 1 --instance-type t2.micro --key-name ClusterKeyPair --security-group-ids sg-c70ff2a1 --subnet-id subnet-39706b4e  --iam-instance-profile Arn=arn:aws:iam::387705308362:instance-profile/ecsInstanceRole --associate-public-ip-address --user-data file://user-data/user-data.sh
 
+Now, once the instance is ready, you should see that you have 3 instances
+registered in the cluster:
+
+    $ aws ecs describe-clusters --cluster searchapp
+
+Output:
+
+    {
+	"clusters": [
+	    {
+		"status": "ACTIVE",
+		"clusterName": "searchapp",
+		"registeredContainerInstancesCount": 3,
+		"pendingTasksCount": 0,
+		"runningTasksCount": 5,
+		"activeServicesCount": 5,
+		"clusterArn": "arn:aws:ecs:us-east-1:387705308362:cluster/searchapp"
+	    }
+	],
+	"failures": []
+    }
+
+One thing to notice, is that once the third instance is available for the cluster,
+since we have 2 instances being heavily used, the scheduler will probably move
+some tasks between the instances. So maybe your MySQL service, or your elasticsearch
+service will be allocated in the new instance. This is a big problem, since those
+are services running tasks that need a volume for persisting their data.
+Unfortunately, right now is not possible to sync the data between instance, and
+as far as I know, is not possible to create services associated to an instance.
+
+In my case when I launched the third instance, my elasticsearch task was relocated
+and I had to to run the rake task for indexing the data again.
+
+If you build the project again, and inspect the output, everything should be OK
+and the application will be deployed to the cluster.
+
+## A word on Blue-Green deployment
+
+One of the reasons that we had to add one more instance to our cluster, was because
+of how ECS launches new updated services. 
+ECS uses a style of deployment known as [Blue-Green deployment](http://martinfowler.com/bliki/BlueGreenDeployment.html)
+in which the new application is launched without removing the old version. 
+This way if something goes wrong with the new version, in ECS words, the ELB
+can't reach the health check successfully, you never have downtime, since the old
+version will still be there attached to the ELB.
+This is great, it gives you more security for launching new releases, but of course
+it brings some difficulties.
+First, we are running services attached to fixed ports, which means
+that you can't run more than one of that service in the same instance, and
+since the new and old releases will be running together for some time, you'll always
+going to need an instance with that port free. So for example, if you have only one application
+that runs in the port 80, you'll need at least `n+1` instances running, with `n` being the number
+of tasks that are running the application.
+In our case we are using 3 instances not because of this, but because of the resources
+that we need (memory, cpu units). Remember that we have 5 services running, and some of them
+use a big amount of resources.
+
+## Adding a GitHub hook
+
+The only thing that need to complete the pipeline, is to add a service hook
+so we can launch deploys when pushing to some branch that we want. This way
+the deploy will be completely automatized.
+
+This is pretty easy, first, go to your GitHub project repository. Then go to
+settings, and select  Webhook & Services.
+
+![GitHub Hook](images/github-webhook.png)
+
+Search for the Jenkins (GitHub plugin) and add the following line
+replacing the host with your jenkins host:
+
+    http://[JENKINS_HOST]/github-webhook/
+
+And click add service.
+
+Now every time you push a change to the master branch, a build will be launched
+for that project in Jenkins.
