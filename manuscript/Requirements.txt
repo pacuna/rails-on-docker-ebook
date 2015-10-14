@@ -2,7 +2,7 @@
 
 This book is for people that have a basic knowledge about Ruby on Rails, 
 Docker and Amazon Web Services. Is not necessary for experts, but there are some
-basic concepts I'm not going to spend time talking about them. If you don't
+basic concepts I'm not going to spend time talking about. If you don't know
 the basics about AWS, I recommend you to go to the [getting started page](https://aws.amazon.com/getting-started/), 
 create an account and start playing with the web console.
 
