@@ -141,7 +141,7 @@ so let's attach it to our new ecsInstanceRole role:
 
 	$ aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role --role-name ecsInstanceRole
 
-Not let's create the instance profile:
+Now let's create the instance profile:
 
 	$ aws iam create-instance-profile --instance-profile-name ecsInstanceRole
 
