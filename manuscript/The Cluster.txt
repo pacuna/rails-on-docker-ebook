@@ -23,28 +23,28 @@ Output:
 	}
 
 The cluster was created successfully, and as you can see in the output 
-it has zero EC2 container instances registered, zero task running and no services.
+it has zero EC2 container instances registered, zero tasks running and no services.
 
 The idea behind the ECS cluster is that you can forget about where and how you're
-tasks and services will be deployed. You just have to launch them and Amazon
-will take care of assigning the service or task to an instance. The only thing
+tasks and services will be deployed. You just have to launch them and the ECS scheduler 
+will take care of where to allocate them inside the cluster. The only thing
 that we have to do now is to add some EC2 instances to the cluster.
 
 ## Launching the EC2 instances
 
 Now that we have our cluster, we can launch a couple of instances and register them
-in the cluster. For launching the instances we'll need:
+in the cluster. Some of the things that we are going to need:
 
 - A Key Pair for ssh access
 - A Security Group
 - An Instance Role
 
 Let's start by creating the key pair. We can create the key and send the output to
-a .pem file using this command:
+a .pem file by using:
 
 	$ aws ec2 create-key-pair --key-name ClusterKeyPair --query 'KeyMaterial' --output text > ClusterKeyPair.pem
 
-Set the permissions of the file:
+Set the permissions for the file:
 
 	$ chmod 400 ClusterKeyPair.pem
 
@@ -96,21 +96,21 @@ Output:
 	    ]
 	}
 
-As you can see from the output, my default vpc group has the id sg-c70ff2a1 and belongs
-to the vpc with id vpc-120cd476. We will use some of this information through the next steps.
-This security group allows all traffic between resources that belongs to the group.
+In my case, the default vpc security group has the id `sg-c70ff2a1` and belongs
+to the vpc with id `vpc-120cd476`. We will use some of this information during the next steps.
+This security group allows all traffic between resources that belong to the group.
 That's good but we also going to need access to the port 22 for getting
 ssh access to our instances. We'll do that later.
 
 Our instances are also going to need an IAM Role in order to allow certain actions
 on the ECS infrastructure. Lucky for us, Amazon AWS has already defined the set
-of policies that we need in a native policy. We only have to create the Role, attach this
-policy, and then add that Role to an instance profile so we can add the
+of policies that we need, in a native policy. We only have to create the Role, attach this native
+policy to that Role, and then add that Role to an instance profile so we can add the
 Role while the instances are being launched.
 
-In the deploy folder of the project, you'll find an standard trust policy for
-creating the Role. The name of the file is AmazonEC2ContainerServiceforEC2Role-Trust-Policy.json.
-Run this command replacing the path to the file:
+Inside the deploy folder, you'll find an standard trust policy for
+creating the Role. The name of the file is `AmazonEC2ContainerServiceforEC2Role-Trust-Policy.json`.
+Let's create our ecsInstanceRole by running this command (use the correct policy path for your case):
 
 	$ aws iam create-role --role-name ecsInstanceRole --assume-role-policy-document file://policies/AmazonEC2ContainerServiceforEC2Role-Trust-Policy.json
 
@@ -136,11 +136,12 @@ Output:
 	    }
 	}
 
-Now we attach the policy to our new ecsInstanceRole role:
+I know the arn identifier for the native policy that we need is `arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role`
+so let's attach it to our new ecsInstanceRole role:
 
 	$ aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role --role-name ecsInstanceRole
 
-create the instance profile:
+Not let's create the instance profile:
 
 	$ aws iam create-instance-profile --instance-profile-name ecsInstanceRole
 
@@ -157,16 +158,16 @@ Output:
 	    }
 	}
 
-and finally attach the Role to that profile:
+and finally let's attach the Role to that profile:
 
 	$ aws iam add-role-to-instance-profile --instance-profile-name ecsInstanceRole --role-name ecsInstanceRole
 
 Now we are ready to launch the instances for the cluster.
 
-The AMI that we'll use it's called amzn-ami-2015.03.g-amazon-ecs-optimized with id
-ami-4fe4852a. This image comes ready and optimized for ECS.
+The ami that we'll use it's called `amzn-ami-2015.03.g-amazon-ecs-optimized` with and id of
+`ami-4fe4852a`. This image comes ready and optimized for ECS.
 
-We are launching 2 instances of type t2.micro and we are going to use
+We are going to launch two instances of type t2.micro and use
 the keys and instance Role that were created previously, one of our subnets and
 the security group for the default vpc.
 
@@ -221,23 +222,22 @@ Output:
 	    ]
 	}
 
-I have 4 available subnets. We can do very advanced stuff using different subnets
-depending on the resources that we want to launch, but in our case let's use just
-one for all the resources.  I'll choose the first one for launching the instances.
+I have 4 available subnets. In our case let's just use
+one for all the resources. I'll choose the first one for launching the instances.
 
 In the following command replace the security-groups-ids with your default
-vpc security group id, the subnet-id with your subnet-id and the Arn of the instance profile which
-you can find in the output of the create-instance-profile.
+vpc security group id, the subnet-id with your subnet-id and the arn of the instance profile 
+with the one you got before.
 
-The user-data parameter allow us to add some initial configuration to the instances.
-In our case we are passing the necessary configuration for registering the instances
-in our searchapp cluster. The user-data.sh file contains just these two lines:
+The user-data parameter allows us to add some initial configuration to the instances.
+In our case, we are passing the configuration for registering the instances
+in our searchapp cluster. The user-data.sh file contains these two lines:
 
 	#!/bin/bash
 	echo ECS_CLUSTER=searchapp >> /etc/ecs/ecs.config
 
-You can find this file in the deploy folder of the source code.
-Now we can run the command for launching the instances:
+You can find this file inside the deploy folder of the source code.
+Now we finally can run the command for launching the instances:
 
 	$ aws ec2 run-instances --image-id ami-4fe4852a --count 2 --instance-type t2.micro --key-name ClusterKeyPair --security-group-ids sg-c70ff2a1 --subnet-id subnet-39706b4e  --iam-instance-profile Arn=arn:aws:iam::387705308362:instance-profile/ecsInstanceRole --associate-public-ip-address --user-data file://user-data/user-data.sh
 
@@ -279,11 +279,11 @@ Output:
 		"InstanceType": "t2.micro",
 		...
 
-You can poll the status of the launched instances using the command
+You can poll the status of the launched instances by using:
 
 	$ aws ec2 describe-instances
 
-After a few minutes, try running this command for polling the state of the cluster
+After a few minutes, try running this other command for polling the state of the cluster
 and see if the instances were correctly registered:
 
 	$ aws ecs describe-clusters --clusters searchapp
@@ -305,4 +305,4 @@ Output:
 	    "failures": []
 	}
 
-Great, we have 2 registered instances in the searchapp cluster.
+Great, we have 2 instances registered in our cluster.
