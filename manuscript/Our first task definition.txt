@@ -6,7 +6,7 @@ A task definition contains the information about the container that you
 want to run. You can create the task definition using a json file, and then register 
 the task in your cluster using the aws cli.
 
-You can find all the task definitions used in this book in the deploy/task-definitions
+All the task definitions used in this book are in the deploy/task-definitions
 directory of the source code.
 
     {
@@ -63,7 +63,7 @@ directory of the source code.
 	"family": "searchapp-db"
     }
 
-This template might look complicated, but there's a lot of irrelevant information
+This template might look complicated, but there's a lot of optional information
 there. Actually, if you use the ECS web console UI for registering task definitions, you'll
 see that most of the container information can be omitted. 
 
@@ -72,11 +72,15 @@ see that most of the container information can be omitted.
 If you used docker-compose in the past, you'll see some similarities between
 the structures of the definitions. Here you also have port mapping, environment
 variables, links with other containers and volumes for persisting the container data.
+Keep in mind that if you link containers in a task definition, those containers
+are going to be deployed in the same EC2 instance. Docker still doesn't support
+link across different hosts.
 
-This task is mapping the port 3306 to the host, declaring the environment variables
-that the [MySQL image](https://hub.docker.com/_/mysql) requires, and creating a volume for mounting the /var/lib/mysql
-directory. This approach will allow us to avoid data lost when the MySQL container
-is restarted. The problem is that we are now coupled to a particular instance, since
+This task defines a map between the port 3306 of the container and the port 3306 of the host.
+It also declares the environment variables the [MySQL image](https://hub.docker.com/_/mysql) requires, 
+and creates a volume for mounting the /var/lib/mysql directory. 
+This approach will allow us to avoid data lost when the MySQL container
+is restarted. The problem is we are now coupled to a particular instance, since
 ECS doesn't sync the data between instances. This is still a dark area in the containers
 world and it's why some people prefer to run only stateless application inside containers
 and use more typical approaches for their database resources.
@@ -155,9 +159,9 @@ Also, now we can create a service scheduler for running a task using this task d
 The service will be in charge of allocating the task somewhere in the cluster and
 restarting the task if the container fails for some reason.
 Since the service associated with this task will deploy the container anywhere
-in the cluster, we need some mechanism for getting some static value that will
-point to the task, in this case to the MYSQL server endpoint. The native way to accomplish
-this in ECS is to create an Elastic Load Balancer and then when you define the service
+in the cluster, we need a mechanism for getting some fixed value that 
+points to the task hostname, in this case to the MYSQL server endpoint. The native way to accomplish
+this in ECS is by creating an Elastic Load Balancer (ELB) and then in the service definition
 you can add an option that attaches the service to the ELB. This way, even if the service
 allocates the task in a different instance between deploys, it will always be
 attached to the ELB.
