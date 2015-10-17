@@ -2,17 +2,18 @@
 
 The simple service created in the previous section was enough for catching
 the essentials of the workflow in ECS. You create your task definition,
-a service that runs that task, when you don't need the task running anymore you
-update the desired-count of tasks for the service, and finally you remove the service.
+and a service that runs a task that uses that task definition. When you don't 
+need the task to be running anymore, you just update the desired-count of tasks
+for the service to zero, and finally remove the service.
 
 Now, let's create a service connected to the ELB. In this case we are going to
 need a json file with the definition of the service. This is a good thing since now
-we can add our task definitions and our services definitions to our version control system.
+we can add our tasks definitions and our services definitions to our version control system.
 We're also going to need a new IAM Role, since this kind of service requires more interaction
-with other resources, especially with the EC2 instances and the ELBs. We can later use this
-same Role for the other services that we need.
+with other resources, especially with the EC2 instances and the ELBs. We can use this
+same Role for the other services that we need to create later.
 
-Use the file deploy/AmazonEC2ContainerServiceRole-Trust-Policy.json for the trust
+Use the file `deploy/AmazonEC2ContainerServiceRole-Trust-Policy.json` for the trust
 policy for this role:
 
     $ aws iam create-role --role-name ecsServiceRole --assume-role-policy-document file://policies/AmazonEC2ContainerServiceRole-Trust-Policy.json
@@ -39,7 +40,7 @@ Output:
 	}
     }
 
-Attach the Amazon provided AmazonEC2ContainerServiceRole policy to this Role:
+And attach the `AmazonEC2ContainerServiceRole` native Amazon policy to this Role:
 
     $ aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceRole --role-name ecsServiceRole
 
@@ -59,10 +60,10 @@ Now that we have the Role, the json for the service should look like this (deplo
 		"role": "ecsServiceRole"
     }
 
-And we create the service using this file as argument for the command (make sure you have the right path
-for the json file):
+And we can create the service using this file as an argument for the `create-service` 
+command:
 
-    $ aws ecs create-service --cluster searchapp --service-name mysql-service --cli-input-json file://mysql-service.json
+    $ aws ecs create-service --cluster searchapp --service-name mysql-service --cli-input-json file://services/mysql-service.json
 
 Output:
 
@@ -110,7 +111,8 @@ Output:
 	}
     }
 
-If we wait a minute and describe the service using its Arn, we'll get:
+Wait for a minute and then describe the service using its Arn (obtained using the `list-services` command), 
+we'll get:
 
     $ aws ecs describe-services --cluster searchapp --services arn:aws:ecs:us-east-1:387705308362:service/mysql-service
 
@@ -168,10 +170,10 @@ If we wait a minute and describe the service using its Arn, we'll get:
 	"failures": []
     }
 
-Now there's an event with the message "(service mysql-service) registered 1 instances in (elb mysql-elb)"
-which means that our MySQL service should now be available using the ELB url. 
-Let's get the ELB dns and then try to connect to the MySQL service from inside
-of one of our instances:
+Now there's an event with the message `(service mysql-service) registered 1 instances in (elb mysql-elb)`
+which means our MySQL service should now be available using the ELB DNS name. 
+Let's get the ELB DNS and then try to connect to the MySQL service from inside
+one of our instances:
 
     $ aws elb describe-load-balancers
 
@@ -232,11 +234,11 @@ Output:
 	]
     }
 
-As you can see from this output, the DNS for this load balancer is internal-mysql-elb-1700927984.us-east-1.elb.amazonaws.com
+As you can see from this output, the DNS for this load balancer is `internal-mysql-elb-1700927984.us-east-1.elb.amazonaws.com`
 and it has one instance attached.
 
-Let's connect to the same instance as before but this time let's try using the ELB dns
-for connecting to the MySQL server, this time using the port 80:
+Let's connect to the same instance as before but this time let's try using the ELB DNS
+for connecting to the MySQL server. This time using the port 80:
 
     $ ssh -i ~/.ssh/keys/ClusterKeyPair.pem ec2-user@ec2-52-23-203-99.compute-1.amazonaws.com
 
@@ -266,10 +268,10 @@ for connecting to the MySQL server, this time using the port 80:
 
     mysql>
 
-Great!, we have our first service in place using our internal load balancer.
+Great! We have our first service in place using our internal load balancer.
 
 For the rest of the tasks, the setup will be pretty similar, we have to register
-the task definitions, create a load balancer for each one and launch services
+the task definitions, create a load balancer for each one, and launch a service
 attached to that load balancer. Once we have all of our dependencies running
 in their services, we can launch our main application and connect it to those
 services.
