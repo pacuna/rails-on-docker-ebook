@@ -1,9 +1,9 @@
 # The Main Application
 
-The only extra attributes that the task definition for our web application is going to have, are several
-environment variables that the container needs for connecting with all the other services. So, for example
-we need environment variables for passing the MySQL credentials, and for the elasticsearch, redis
-and memcached endpoints.
+Some extra configuration for this task definition consists in
+environment variables that the container needs for connecting with all the other services. For example,
+we need environment variables for passing the MySQL credentials and for all
+the dependencies hostnames.
 
 A quick way for getting all the endpoints for the internal ELBs is to run:
 
@@ -19,7 +19,7 @@ Output:
 	"internal-memcached-elb-47598939.us-east-1.elb.amazonaws.com"
     ]
 
-Let's use those endpoints in the web application task definition:
+Let's use those endpoints in the application task definition:
 
     {
 	"containerDefinitions": [
@@ -85,8 +85,13 @@ Let's use those endpoints in the web application task definition:
 	"family": "searchapp"
     }
 
+Now, of course all of this configuration is already in the respective files
+of the application. For example, the MySQL configuration is in the `config/database.yml` file,
+the elasticsearch configuration is in the `config/initializers/elasticsearch.rb`, the redis
+configuration is in a sidekiq initializer and the memcached configuration is in the environment
+file for the production environment.
 
-As usual we also need an ELB for accessing our application. Let's create one now:
+As usual, we need an ELB for accessing our application. Let's create one now:
 
     $ aws elb create-load-balancer --load-balancer-name searchapp-elb --listeners Protocol=HTTP,LoadBalancerPort=80,InstanceProtocol=HTTP,InstancePort=80 --subnets subnet-39706b4e --security-groups sg-c70ff2a1
 
@@ -96,11 +101,11 @@ Output:
 	"DNSName": "searchapp-elb-1102698401.us-east-1.elb.amazonaws.com"
     }
 
-Now, I have configured an special endpoint for the health check of this ELB. This is because
+I have configured an special endpoint that I want the health check for this ELB to use. This is because
 once our application is up, we first need to index all the elasticsearch data. But the ELB
 will try to ping the default health check route which is '/' and that's going to return an error (the ELB needs a 200 status code), 
 causing the task to be restarted. So instead we'll use a custom '/healthcheck' route which always
-responds 200 as long as our webapp is up.
+responds 200 as long as our application is up and will not return errors for missing indexes.
 
 For configuring the health check endpoint let's run:
 
@@ -118,16 +123,16 @@ Output:
 	}
     }
 
-Another difference with this ELB is we don't want this to be an internal ELB, since is has to be public
-for people can access our application, so we don't need the internal flag.
+Another difference with this ELB is we don't want it to be an internal ELB, since is has to be public
+so people can access our application, therefore we don't need the internal flag.
 
-We also have to expose the port 80 in our instances and in the ELB. Since all these resources are sharing
-the same security group, the easiest way is to add rule for open access to port 80 on that security group (remember
-to change the security group with yours):
+We also have to expose the port 80 in our instances and in the ELB. All of these resources are sharing
+the same security group, and the easiest way is to add a new rule for open access to the port 80 on that security group (remember
+to change the security group with the one for your vpc):
 
     $ aws ec2 authorize-security-group-ingress --group-id sg-c70ff2a1 --protocol tcp --port 80 --cidr 0.0.0.0/0
 
-The service json schema for our webapp looks like this:
+The json format for our service application is:
 
     {
 	"serviceName": "searchapp-service",
@@ -143,9 +148,9 @@ The service json schema for our webapp looks like this:
 	"role": "ecsServiceRole"
     }
 
-Let's register our task definition:
+Let's first register our task definition:
 
-    $ aws ecs register-task-definition --cli-input-json file://searchapp.json
+    $ aws ecs register-task-definition --cli-input-json file://task-definitions/searchapp.json
 
 Output:
 
@@ -220,7 +225,7 @@ Output:
 
 And create the service:
 
-    $ aws ecs create-service --cluster searchapp --service-name searchapp-service --cli-input-json file://searchapp-service.json
+    $ aws ecs create-service --cluster searchapp --service-name searchapp-service --cli-input-json file://services/searchapp-service.json
 
 Output:
 
@@ -258,17 +263,17 @@ Output:
 	}
     }
 
-Wait for few minutes, and if everything went ok, visit the dns of the searchapp-elb and you'll see our
-empty application. In my case the endpoint is searchapp-elb-1102698401.us-east-1.elb.amazonaws.com;
+Wait for few minutes, and if everything went OK, visit the DNS address of the `searchapp-elb` and you'll see the
+empty application. In my case the endpoint is `searchapp-elb-1102698401.us-east-1.elb.amazonaws.com`
 
 ![Empty Web Application](images/empty-app.png)
 
-Great! if you can see the web application, it means that the database connection and the migrations were
-successful. We don't have data, since all the data for this sample application gets created through
-database seeds. So we have to seed the database and then index the data.
+Great! If you can see the web application, it means the database connection and the migrations were
+successful. We still don't have data, and that's because all the data for this sample application gets created through
+database seeds. So the next step is to seed the database and then index the data.
 
-We need to access to our application in order to seed the data.
-A quick way to getting the DNS of the instance that's running this tasks is by describing the associated
+We need to access our application in order to seed the data.
+A quick way for getting the DNS of the instance that's running this tasks is by describing the associated
 ELB and query directly for the instance id:
 
     $ aws elb describe-load-balancers --load-balancer-name searchapp-elb --query "LoadBalancerDescriptions[*].Instances[*].InstanceId"
@@ -282,7 +287,7 @@ Output:
     ]
 
 
-And then we can describe the instance using the instance id and query for the dns:
+And then we can describe the instance using the instance id and query for it DNS:
 
     $ aws ec2 describe-instances --instance-ids i-8372af57 --query "Reservations[*].Instances[*].PublicDnsName"
 
@@ -309,7 +314,7 @@ Cool, let's connect to that instance:
     -bash: warning: setlocale: LC_CTYPE: cannot change locale (UTF-8): No such file or directory
     [ec2-user@ip-172-31-1-131 ~]$
 
-If you run docker ps on your instance, you'll see that the searchapp web application is running:
+If you run docker ps on your instance, you'll see that the `searchapp` container is running:
 
     $ docker ps
     CONTAINER ID        IMAGE                            COMMAND                CREATED             STATUS              PORTS                         NAMES
@@ -317,7 +322,7 @@ If you run docker ps on your instance, you'll see that the searchapp web applica
     efd0080d60b9        memcached                        "/entrypoint.sh memc   4 hours ago         Up 4 hours          0.0.0.0:11211->11211/tcp      ecs-memcached-1-searchapp-memcached-fc96dee99bf0828c2c00
     957d272d3081        amazon/amazon-ecs-agent:latest   "/agent"               16 hours ago        Up 16 hours         127.0.0.1:51678->51678/tcp    ecs-agent
 
-Now can execute commands in that container as usual. My preferred way is to go inside the container and run 
+We can execute commands in that container as usual. I prefer to go inside the container and run 
 the commands there. We can do this by running (replace the container id with the one in your output):
 
     $ docker exec -it f3831182e38d bash
@@ -328,7 +333,7 @@ Now we are inside of the rails application. You can run all the typical commands
 the log, etc. Just keep in mind that you're in production environment.
 
 Now, before running the seeds, I've had some troubles with the database collation, but they are really easy to
-fix, we just have to recreate our database, connect to it and run a MySQL command.
+fix. We just have to recreate our database, connect to it and run a MySQL command.
 
 First let's recreate our database:
 
@@ -337,7 +342,7 @@ First let's recreate our database:
     $ RAILS_ENV=production rake db:migrate
 
 In this container we have MySQL available, so we can connect right from here. Look for your MySQL load balancer
-dns address (look in your searchapp task definition):
+DNS address (in your searchapp task definition or listing your ELBs):
 
     $ mysql -h internal-mysql-elb-1700927984.us-east-1.elb.amazonaws.com -u root -pmysupersecretpassword -P 80
     Welcome to the MySQL monitor.  Commands end with ; or \g.
@@ -368,10 +373,10 @@ And that's it. Run exit to get back to the container, and now run the seeds:
 
     $ RAILS_ENV=production rake db:seed
 
-You'll see a lot of output for the data being inserted into the database. Just wait
-until finishes.
+You'll see a lot of output of the data being inserted into the database. Just wait
+until it finishes.
 
-Once it's ready, we can index the data using the task provided by the elasticsearch-rails gem
+Once it's ready, we can index the data using the task provided by the `elasticsearch-rails` gem
 (you can use this task anytime you change your index or you want to reindex your data):
 
     $ RAILS_ENV=production bundle exec rake environment elasticsearch:import:model CLASS='Article' FORCE='y' BATCH=100
@@ -380,11 +385,11 @@ Output:
 
     [IMPORT] Done
 
-Now if you visit the web page of the application again, you'll see that we have all the data:
+Now if you visit the web page of the application again, you'll see that this time we have data:
 
 ![Complete Web Application](images/complete-app.png)
 
-That's great. So right now we're pretty sure that MySQL and Elasticsearch are working correctly.
+That's great. Right now we're sure that MySQL and Elasticsearch are working correctly.
 But what about redis and memcached? Well, the project comes with a worker ready for use.
 The worker will index the data using Sidekiq every time a record gets modified.
 
@@ -392,15 +397,17 @@ First let's run the worker:
 
     root@f3831182e38d:/home/app/webapp# RAILS_ENV=production bundle exec sidekiq --queue elasticsearch --verbose
 
-The console will be attached while we have Sidekiq running, we just want to check if the hook with redis is correct:
+The console will be attached while we have Sidekiq running. We just want to check if the hook with redis is correct:
 
 If you see the first line of the output in the console, you should see something like this:
 
     2015-10-10T19:36:16.169Z 1377 TID-a8c4g INFO: Booting Sidekiq 3.3.4 with redis options {:url=>"redis://internal-redis-elb-124984907.us-east-1.elb.amazonaws.com:80/12"}
 
-Which means that the connection was successful.
+Which means that the connection was successful. You can even try opening another session inside the container
+while you have Sidekiq running and modify some article using the rails console. You should see some output
+in the Sidekiq window for the record being reindexed.
 
-Let's hit Ctrl-c for exiting sidekiq and open a rails console:
+Let's hit Ctrl-c for exiting Sidekiq and open a rails console:
 
     root@f3831182e38d:/home/app/webapp# rails c production
 
@@ -411,5 +418,4 @@ And let's clean the cache:
     Dalli::Server#connect internal-memcached-elb-47598939.us-east-1.elb.amazonaws.com:80
     => [true]
 
-You can see that the connection with memcached is working properly.
-
+You can see the connection with memcached is working properly.
