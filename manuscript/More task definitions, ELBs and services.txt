@@ -1,6 +1,6 @@
 # More task definitions, ELBs and Services
 
-Now that we understand the basics of the ECS workflow, let's register the task definitions
+Now that we know the basics of the ECS workflow, let's register the task definitions
 for the remaining dependencies: elasticsearch, redis and memcached. All of these
 services need to run behind an ELB so our main application can discover the endpoints
 correctly.
@@ -49,7 +49,7 @@ Here we have the task definition for elasticsearch:
 Pretty similar to the MySQL task definition. We are using a volume for 
 persisting the elasticsearch data, using 256 MiB for memory, and 128 cpu units.
 The port mapping is 9200 from the container to 9200 on the instance.
-Let's register this task on our cluster:
+Let's register this task in our cluster:
 
     $ aws ecs register-task-definition --cli-input-json file://task-definitions/elasticsearch.json
 
@@ -98,7 +98,7 @@ Output:
 	}
     }
 
-Now, before we create the service let's add a new ELB for elasticsearch. Remember 
+Now, before create the service let's add a new ELB for elasticsearch. Remember 
 to use your security group and subnet ids:
 
     $ aws elb create-load-balancer --load-balancer-name elasticsearch-elb --listeners Protocol=TCP,LoadBalancerPort=80,InstanceProtocol=TCP,InstancePort=9200 --subnets subnet-39706b4e --scheme internal --security-groups sg-c70ff2a1
@@ -109,7 +109,7 @@ Output:
 	"DNSName": "internal-elasticsearch-elb-907663077.us-east-1.elb.amazonaws.com"
     }
 
-In this case we need a listener for the port 9200 off the instance.
+In this case we need a listener for the port 9200 of the instance.
 
 Now we can launch the service using the task definition and the ELB. 
 The json file for this service should look this way:
@@ -131,7 +131,7 @@ The json file for this service should look this way:
 
 And we launch it with:
 
-    $ aws ecs create-service --cluster searchapp --service-name elasticsearch-service --cli-input-json file://elasticsearch-service.json
+    $ aws ecs create-service --cluster searchapp --service-name elasticsearch-service --cli-input-json file://services/elasticsearch-service.json
 
 Output:
 
@@ -187,11 +187,11 @@ where the service is running and try to reach the service, we get:
       "tagline" : "You Know, for Search"
     }
 
-Great, so we have that service ready.
+Great, so that service is ready.
 
 ## Redis
 
-The task definition for redis should be:
+The task definition for redis is:
 
 
     {
@@ -222,7 +222,7 @@ The task definition for redis should be:
     }
 
 In this case we're not mounting a volume and we are using less memory than the first two.
-The amount of memory and cpu units that you want to use for a task, it's probably going to be 
+The amount of memory and cpu units that you want to use for a task it's probably going to be 
 the outcome of experimentation with your containers. Sometimes you'll launch a task with a less
 amount than the container really needs and the process will be killed. So keep in mind
 that a typical failure can be produced for using the wrong amount of memory and/our cpu units.
@@ -294,7 +294,7 @@ And use this json for launching the service:
 
 Launch the service:
 
-    $ aws ecs create-service --cluster searchapp --service-name redis-service --cli-input-json file://redis-service.json
+    $ aws ecs create-service --cluster searchapp --service-name redis-service --cli-input-json file://services/redis-service.json
 
 Output:
 
@@ -368,7 +368,7 @@ The task definition is pretty similar to the redis one:
 
 Register the task:
 
-    $ aws ecs register-task-definition --cli-input-json file://memcached.json
+    $ aws ecs register-task-definition --cli-input-json file://task-definitions/memcached.json
 
 Output:
 
@@ -414,7 +414,7 @@ Output:
 	"DNSName": "internal-memcached-elb-47598939.us-east-1.elb.amazonaws.com"
     }
 
-And launch a service using this json:
+Launch a service using this json:
 
     {
 	"serviceName": "memcached-service",
@@ -430,7 +430,7 @@ And launch a service using this json:
 	"role": "ecsServiceRole"
     }
 
-Create the service:
+And create the service:
 
     $ aws ecs create-service --cluster searchapp --service-name memcached-service --cli-input-json file://memcached-service.json
 
@@ -470,8 +470,8 @@ Output:
 	}
     }
 
-And that's it for our dependencies services. If you list your available services you'll see the four services that
-we created:
+And that's it for our dependencies services. If you list your available services 
+you'll see the four services that we created:
 
     $ aws ecs list-services --cluster searchapp
 
@@ -488,4 +488,3 @@ Output:
 
 Now we cant start with our Rails application that's going to be connected with each one of these services using their
 respective internal ELBs.
-
