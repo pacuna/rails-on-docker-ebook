@@ -1,0 +1,120 @@
+# Running the application locally
+
+First, clone the repository:
+
+    $ git clone git@github.com:pacuna/searchapp.git
+
+Go inside the folder and run:
+
+    $ vagrant up
+
+This process can take some time since it's going to download
+the Ubuntu image and install docker and docker-compose the first time.
+
+Once it's finished, connect to the VM using ssh:
+
+    $ vagrant ssh
+
+Go the shared folder where the application source code is:
+
+    $ cd /code/searchapp
+
+Use docker-compose for build the application container and for
+pulling the necessary dependencies:
+
+    $ docker-compose up -d
+
+This command will build the main application using the source code
+and will pull the MySQL, elasticsearch, redis and memcached images from DockerHub.
+Then is going to run all the containers creating the corresponding links.
+All of this is defined is the `docker-compose.yml` file.
+
+Once it's done, list all the running containers:
+
+    $ docker-compose ps
+
+Output:
+
+	    Name                       Command               State               Ports
+    ---------------------------------------------------------------------------------------------
+    searchapp_db_1          /entrypoint.sh mysqld            Up       3306/tcp
+    searchapp_dbdata_1      /entrypoint.sh /bin/true         Exit 0
+    searchapp_es_1          /docker-entrypoint.sh elas ...   Up       9200/tcp, 9300/tcp
+    searchapp_memcached_1   /entrypoint.sh memcached         Up       11211/tcp
+    searchapp_redis_1       /entrypoint.sh redis-server      Up       6379/tcp
+    searchapp_webapp_1      /sbin/my_init                    Up       443/tcp, 0.0.0.0:80->80/tcp
+
+We can see our application is running and the name that docker-compose gave it
+is `searchapp_webapp_1`. Let's create a bash session inside of the container:
+
+    $ docker exec -it searchapp_webapp_1 bash
+
+Output:
+
+    root@13df47c66ebc:/home/app/webapp#
+
+Now we are inside the container. We can run the commands for initialize the data.
+First, let's create, migrate and seed our database:
+
+    # rake db:create
+    # rake db:migrate
+    # rake db:seed
+
+The seed command can take some time, since it's going to insert a lot
+of records into our database container.
+
+Once the seed command finishes, we can index the data using a rake task provided
+by the `elasticsearch-rails` gem:
+
+
+    # rake environment elasticsearch:import:model CLASS='Article' FORCE='y' BATCH=100
+
+Output:
+
+    [!!!] Index does not exist (Elasticsearch::Transport::Transport::Errors::NotFound)
+    [IMPORT] Done
+
+You can find more information about this task in the [gem's repository](https://github.com/elastic/elasticsearch-rails/).
+
+Now we are ready. Go to http://33.33.33.99 and you'll see the application:
+
+![Our Application](images/final-app-dev.png)
+
+Let's try the indexer worker that comes with the application in order to test
+our redis connection. Still inside the container, run:
+
+    # bundle exec sidekiq --queue elasticsearch --verbose
+
+Output:
+
+    2015-10-18T01:09:41.918Z 263 TID-24in8 INFO: Booting Sidekiq 3.3.4 with redis options {:url=>"redis://172.17.0.3:6379/12"}
+
+	     s
+	      ss
+	 sss  sss         ss
+	 s  sss s   ssss sss   ____  _     _      _    _
+	 s     sssss ssss     / ___|(_) __| | ___| | _(_) __ _
+	s         sss         \___ \| |/ _` |/ _ \ |/ / |/ _` |
+	s sssss  s             ___) | | (_| |  __/   <| | (_| |
+	ss    s  s            |____/|_|\__,_|\___|_|\_\_|\__, |
+	s     s s                                           |_|
+	      s s
+	     sss
+	     sss
+
+Great, Sidekiq is communicating correctly with the redis containers.
+Hit Ctr-C for stopping the worker and start a rails console:
+
+    # rails c
+
+And clear the cache:
+
+    > Rails.cache.clear
+
+Output:
+
+    Cache clear: flushing all keys
+    Dalli::Server#connect 172.17.0.1:11211
+    => [true]
+
+This means the connection with the memcached container is also correct.
