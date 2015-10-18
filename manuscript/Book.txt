@@ -5,8 +5,6 @@ mainmatter:
 Requirements.txt
 Setup.txt
 Running the app locally.txt
-ECS basic concepts.txt
-AWS CLI reference.txt
 The Cluster.txt
 Our first task definition.txt
 Our first ELB.txt
