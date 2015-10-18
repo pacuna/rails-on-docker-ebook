@@ -56,9 +56,9 @@ Output:
 Now we are inside the container. We can run the commands for initialize the data.
 First, let's create, migrate and seed our database:
 
-    # rake db:create
-    # rake db:migrate
-    # rake db:seed
+    $ rake db:create
+    $ rake db:migrate
+    $ rake db:seed
 
 The seed command can take some time, since it's going to insert a lot
 of records into our database container.
@@ -67,7 +67,7 @@ Once the seed command finishes, we can index the data using a rake task provided
 by the `elasticsearch-rails` gem:
 
 
-    # rake environment elasticsearch:import:model CLASS='Article' FORCE='y' BATCH=100
+    $ rake environment elasticsearch:import:model CLASS='Article' FORCE='y' BATCH=100
 
 Output:
 
@@ -83,7 +83,7 @@ Now we are ready. Go to http://33.33.33.99 and you'll see the application:
 Let's try the indexer worker that comes with the application in order to test
 our redis connection. Still inside the container, run:
 
-    # bundle exec sidekiq --queue elasticsearch --verbose
+    $ bundle exec sidekiq --queue elasticsearch --verbose
 
 Output:
 
@@ -105,7 +105,7 @@ Output:
 Great, Sidekiq is communicating correctly with the redis containers.
 Hit Ctr-C for stopping the worker and start a rails console:
 
-    # rails c
+    $ rails c
 
 And clear the cache:
 
