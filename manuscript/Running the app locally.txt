@@ -1,10 +1,6 @@
 # Running the application locally
 
-First, clone the repository:
-
-    $ git clone git@github.com:pacuna/searchapp.git
-
-Go inside the folder and run:
+Go to the project root folder and run:
 
     $ vagrant up
 

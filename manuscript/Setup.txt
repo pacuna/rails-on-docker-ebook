@@ -3,56 +3,38 @@
 This is not a book about Ruby on Rails development, so we are not going to
 build an application from scratch. Instead, we're going to deploy a sample application
 from the [elasticsearch-rails gem repository](https://github.com/elastic/elasticsearch-rails/tree/master/elasticsearch-rails).
-This a fully working example of a Rails application that uses elasticsearch
-as a search engine.
+This an example of how to integrate Elasticsearch to a Rails application.
 This is how our final application is going to look like:
 
 ![Complete Web Application](images/complete-app.png)
 
-It's basically a search application that has several articles from the New York Times
-persisted in a database and indexed using elasticsearch.
-This application is distributed through several Rails templates available in the official repository, and since we need
-to modify some things in order to dockerize the application, I've created a repository
-with the final result.
+The application it's basically a faceted browser for articles from the New York Times.
+This articles are seeded into the database and indexed into an Elasticsearch cluster.
+
+This application is distributed through several Rails templates available in the official repository of the gem.
+I just made some small modifications in order to dockerize the application and also pushed the 
+final result to a public repository under my GitHub account.
+I've also added a Vagrantfile that's going to give us an environment ready for
+running the dockerized application. This way you don't have to install anything except Vagrant and
+its dependencies on your local machine.
 
 ## Getting the source code
 
-First, clone the repository in your local machine:
+First, clone the repository on your local machine:
 
     git clone git@github.com:pacuna/searchapp.git
 
-Now you'll have access to all the necessary files for deploying the application
-with Amazon ECS. All these files are inside the deploy folder.
+Now you'll have access to all the necessary files for testing the application locally and
+for deploying with Amazon ECS.
 
-You're also going to need an Amazon AWS account and a DockerHub account.
 Once you have your DockerHub account ready, create a new public repository and name it
 "yourusername/searchapp". We are going to push our container images to that repository in order
 to pull them from ECS.
-For pushing the images to DockerHub you'll need Docker installed on your machine. It doesn't
-matter is you are using native Docker, Vagrant, boot2docker, or Docker Toolbox. We just need
-Docker to be connected to your DockerHub account.
 
-Finally, you'll need the aws cli tool for accessing the Amazon AWS api.
+Finally, you'll need the AWS CLI tool for accessing the Amazon AWS api.
 For setup instructions, visit [this link](https://aws.amazon.com/cli/)
 
-## Pushing the image to Dockerhub
+Once you installed this tool, you can configure it to use your credentials by running
 
-Now that you have the source code and Docker running on your computer, try to authenticate
-Docker with your DockerHub account. Run:
+    $ aws configure
 
-    $ docker login
-
-and use your account information. This information will be saved on your system for posterior use.
-Now, let's build and push the image.
-In the root of the project run:
-
-    docker build -t yourusername/searchapp:1.0
-
-This command will build and tag the image that contains the application. This can take several minutes
-the first time.
-Once finished, push the image to DockerHub:
-
-    docker push yourusername/searchapp:1.0
-
-If you have any errors during this step, it's probably because you haven't created the DockerHub repository yet or your
-credentials are incorrect.
