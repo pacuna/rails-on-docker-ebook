@@ -1,20 +1,24 @@
 # Setting up the project
 
 This is not a book about Ruby on Rails development, so we are not going to
-build an application from scratch. Instead, we're going to deploy a sample application
+build something from scratch. Instead, we're going to deploy a sample application
 from the [elasticsearch-rails gem repository](https://github.com/elastic/elasticsearch-rails/tree/master/elasticsearch-rails).
-This an example of how to integrate Elasticsearch to a Rails application.
-This is how our final application is going to look like:
+This application is an example of how to integrate Elasticsearch with Ruby on Rails.
+
+Our final application will look like this:
 
 ![Complete Web Application](images/complete-app.png)
 
-The application it's basically a faceted browser for articles from the New York Times.
-This articles are seeded into the database and indexed into an Elasticsearch cluster.
+We're basically deploying a faceted browser for articles from the New York Times.
+These articles are seeded into the database and indexed into an Elasticsearch cluster.
+It also comes with a worker that sends jobs to a Sidekiq queue using redis.
+Finally, I've added a cache storage to the application using memcached just for making it
+even more realistic.
 
 This application is distributed through several Rails templates available in the official repository of the gem.
 I just made some small modifications in order to dockerize the application and also pushed the 
 final result to a public repository under my GitHub account.
-I've also added a Vagrantfile that's going to give us an environment ready for
+We will use vagrant for creating an environment ready for
 running the dockerized application. This way you don't have to install anything except Vagrant and
 its dependencies on your local machine.
 
