@@ -8,9 +8,13 @@ create an account and start playing with the web console.
 
 Some of the things that you'll need in order to follow the instructions:
 
-- A [GitHub](http://github.com) account and Git properly configured in your machine
+- A [GitHub](http://github.com) account and Git properly configured on your machine
 - An [AWS](https://aws.amazon.com) account
 - API credentials for your AWS account
-- the [aws cli](https://aws.amazon.com/cli) tool ready for use
-- [Docker](https://www.docker.com)
+- The [AWS CLI](https://aws.amazon.com/cli) tool
 - A [DockerHub](https://hub.docker.com) account
+
+You're also going to need Docker and Docker Compose, but those tools
+will be installed on the virtual machine that comes with the source code.
+From there, you'll be able to run Docker commands and push the image to your
+DockerHub account.
