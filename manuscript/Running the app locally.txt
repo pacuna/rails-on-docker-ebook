@@ -61,7 +61,7 @@ pulling the necessary dependencies:
     $ docker-compose up -d
 
 This command will build the main application using the source code
-and will pull the MySQL, Elasticsearch, Redis and Memcached images from DockerHub.
+and pull the MySQL, Elasticsearch, Redis and Memcached images from DockerHub.
 Then, is going to run all the containers and create the corresponding links between them.
 All of this is defined in the `docker-compose.yml` file.
 
@@ -180,7 +180,7 @@ Our Dockerfile looks like this:
 If you want to learn more about configuration details for this image,
 the GitHub repository contains a lot of useful information.
 
-There main differences between this development setup and the
+The main differences between this development setup and the
 production setup are:
 
 - All the containers run on the same host, as opposed to production where
@@ -235,7 +235,8 @@ Output:
 
 You can find more information about this task in the [gem's repository](https://github.com/elastic/elasticsearch-rails/).
 
-Now we are ready. Go to http://33.33.33.99 and you'll see the application:
+Now that we are ready, go to http://33.33.33.99 which is the IP that was declared for this VM,
+and you'll see the application running:
 
 ![Our Application](images/final-app-dev.png)
 
@@ -261,8 +262,8 @@ Output:
 	     sss
 	     sss
 
-Great, Sidekiq is communicating correctly with the redis containers.
-Hit Ctr-C for stopping the worker and start a rails console:
+Great, Sidekiq is communicating correctly with the Redis container.
+Hit `Ctr-C` for stopping the worker and then start a rails console:
 
     $ rails c
 
