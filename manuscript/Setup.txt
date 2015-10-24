@@ -18,21 +18,29 @@ even more realistic.
 This application is distributed through several Rails templates available in the official repository of the gem.
 I just made some small modifications in order to dockerize the application and also pushed the 
 final result to a public repository under my GitHub account.
-We will use vagrant for creating an environment ready for
+We will use [Vagrant](https://www.vagrantup.com/) for creating an environment ready for
 running the dockerized application. This way you don't have to install anything except Vagrant and
 its dependencies on your local machine.
 
+If you don't have Vagrant installed, go to the [download page](https://www.vagrantup.com/downloads.html)
+and download the proper package for your system. You're also going to need a
+virtualization software such as [VirtualBox](https://www.vagrantup.com/downloads.html).
+
 ## Getting the source code
 
-First, clone the repository on your local machine:
+First, clone the final application repository:
 
     git clone git@github.com:pacuna/searchapp.git
 
-Now you'll have access to all the necessary files for testing the application locally and
-for deploying with Amazon ECS.
+This repository contains all the necessary files for testing the application locally and
+for deploying it with Amazon ECS.
+
+We also need a DockerHub account for hosting the Docker image for our project.
+If you don't have an account, go to the [DockerHub](https://hub.docker.com/) sign up page
+and fill out the form with your information. 
 
 Once you have your DockerHub account ready, create a new public repository and name it
-"yourusername/searchapp". We are going to push our container images to that repository in order
+`searchapp`. We are going to push our container images to that repository in order
 to pull them from ECS.
 
 Finally, you'll need the AWS CLI tool for accessing the Amazon AWS api.
