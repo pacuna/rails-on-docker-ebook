@@ -1,19 +1,22 @@
 # Pushing the image to DockerHub
 
-Now that we've test our application, let's push it to DockerHub.
-From inside the Virtual Machine run:
+Now that we've tested our application, let's push it to DockerHub.
+From inside of the Virtual Machine, run:
 
     $ docker login
 
-Use your DockerHub account information. This information will be saved on the system for posterior use.
-Now, let's build and push the image.
+Use your DockerHub account information. This information will be saved on the 
+system for posterior use.
+
+Now that you have permissions to push to your account, let's build and push the image.
 In the root of the project run:
 
     docker build -t yourusername/searchapp:1.0
 
 This command will build and tag the image that contains the application. It can take several minutes
 the first time.
-Once it's finishes, push the image to DockerHub:
+
+Once it's finished, push the image to DockerHub:
 
     docker push yourusername/searchapp:1.0
 
@@ -21,4 +24,4 @@ If you have any errors during this step, it's probably because you haven't creat
 credentials are incorrect.
 
 Now if you visit your repositories page in DockerHub, you should see
-the project with its respective tag.
+the project with the respective tag.
