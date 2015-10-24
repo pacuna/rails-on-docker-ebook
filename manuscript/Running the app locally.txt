@@ -1,10 +1,50 @@
 # Running the application locally
 
+In this chapter I'll show how to run the `searchapp` application locally
+using a virtual machine. We'll run the main application and all the dependencies
+on different Docker containers. The good thing about this, is we are going to use
+the exactly same images in production, so even though we have to change some minor details, 
+the production environment should be work almost out the box.
+
 Go to the project root folder and run:
 
     $ vagrant up
 
-This process can take some time since it's going to download
+This command will create the environment declared in the Vagranfile.
+This file contains the following configuration:
+
+    VAGRANTFILE_API_VERSION = "2"
+
+    Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+
+      config.vm.box     = "vivid"
+      config.vm.box_url = "http://cloud-images.ubuntu.com/vagrant/vivid/current/vivid-server-cloudimg-amd64-vagrant-disk1.box"
+
+      config.vm.provider :virtualbox do |vb|
+	vb.customize ["modifyvm", :id, "--memory", "2048"]
+	vb.customize ["modifyvm", :id, "--natdnsproxy1", "off"]
+      end
+
+      config.vm.network :private_network, ip: "33.33.33.99"
+      config.vm.network "forwarded_port", guest: 80, host: 80
+
+      config.vm.synced_folder ".", "/vagrant", disabled: true
+      config.vm.synced_folder ".", "/code/searchapp", type: 'nfs'
+
+      config.vm.provision :shell, :inline => 'apt-get update'
+
+    end
+
+
+If you're not familiarized with the Vagrant DSL, don't worry. You just
+need to know that we are using the Ubuntu Vivid image for our virtual machine,
+we are using a private IP, and we're mounting a shared folder
+between our host and our guest machine. This way if you want to modify the code
+on your local computer, the changes will be reflected immediately inside of the VM.
+Finally, we are provisioning our machine with a custom shell script in order
+to install Docker and Docker Compose during the bootstrap.
+
+The `up` process can take some time since it's going to download
 the Ubuntu image and install docker and docker-compose the first time.
 
 Once it's finished, connect to the VM using ssh:
@@ -21,11 +61,135 @@ pulling the necessary dependencies:
     $ docker-compose up -d
 
 This command will build the main application using the source code
-and will pull the MySQL, elasticsearch, redis and memcached images from DockerHub.
-Then is going to run all the containers creating the corresponding links.
-All of this is defined is the `docker-compose.yml` file.
+and will pull the MySQL, Elasticsearch, Redis and Memcached images from DockerHub.
+Then, is going to run all the containers and create the corresponding links between them.
+All of this is defined in the `docker-compose.yml` file.
 
-Once it's done, list all the running containers:
+If you inspect the `docker-compose.yml` file you'll see that we have
+a MySQL container image that uses a volume from a data-only container:
+
+    dbdata:
+      image: mysql:5.7
+      name: searchapp-db-data
+      environment:
+	- MYSQL_ROOT_PASSWORD=secretpassword
+      volumes:
+	- /var/lib/mysql
+      command: /bin/true
+    db:
+      image: mysql:5.7
+      name: searchapp-db
+      environment:
+	- MYSQL_ROOT_PASSWORD=secretpassword
+      volumes_from:
+	- dbdata
+
+An Elasticsearch container image that mounts a volume for its data directory:
+
+    es:
+      image: elasticsearch
+      name: searchapp-es
+      volumes:
+       - /var/lib/elasticsearch
+
+A Redis container image:
+
+    redis:
+      image: redis:2.6
+
+A Memcached container image:
+
+    memcached:
+      image: memcached
+
+
+And the block for building our application from the source code
+in the shared folder:
+
+    webapp:
+      build: .
+      name: searchapp 
+      working_dir: /home/app/webapp
+      ports:
+	- "80:80"
+      environment:
+	- PASSENGER_APP_ENV=development
+      links:
+	- es
+	- db
+	- redis
+	- memcached
+      volumes:
+	- .:/home/app/webapp
+
+This last segment also contains the links with the other containers.
+Now, how are we building the application? The answer is in our Dockerfile.
+Since one of the main reasons of using Docker is to be able to mimic a production
+environment locally, we should test our application by using just production
+ready images. In this case, the Ruby application is powered by the 
+[phusion passenger image](https://github.com/phusion/passenger-docker).
+
+Our Dockerfile looks like this:
+
+
+    FROM phusion/passenger-ruby22
+
+    # Set correct environment variables.
+    ENV HOME /root
+
+    # Use baseimage-docker's init process.
+    CMD ["/sbin/my_init"]
+
+    # additional packages 
+    RUN apt-get update && apt-get install -y mysql-client-core-5.5
+
+    # Active nginx
+    RUN rm -f /etc/service/nginx/down
+
+    # Install heavy gems for adding an extra caching layer
+    RUN gem install nokogiri:1.6.6.2 mini_portile:0.6.2
+
+    # Install bundle of gems
+    WORKDIR /tmp
+    ADD Gemfile /tmp/
+    ADD Gemfile.lock /tmp/
+
+    RUN bundle install
+
+    # Copy the nginx template for configuration and preserve environment variables
+    RUN rm /etc/nginx/sites-enabled/default
+
+    # Add the nginx site and config
+    ADD webapp.conf /etc/nginx/sites-enabled/webapp.conf
+
+    # Add the rails-env configuration file
+    ADD rails-env.conf /etc/nginx/main.d/rails-env.conf
+
+    RUN mkdir /home/app/webapp
+    COPY . /home/app/webapp
+    RUN usermod -u 1000 app
+    RUN chown -R app:app /home/app/webapp
+    WORKDIR /home/app/webapp
+
+    RUN mkdir -p /etc/my_init.d
+    ADD deploy/start.sh /etc/my_init.d/start.sh
+
+    # Clean up APT when done.
+    RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+If you want to learn more about configuration details for this image,
+the GitHub repository contains a lot of useful information.
+
+There main differences between this development setup and the
+production setup are:
+
+- All the containers run on the same host, as opposed to production where
+the containers can run in any node of the cluster
+- The main application is built using the source code, as opposed to production
+where the Amazon agent needs to pull the image from some registry (DockerHub in our case).
+
+Once it's done, you can list all the running containers for this Docker Compose
+directory:
 
     $ docker-compose ps
 
@@ -49,7 +213,7 @@ Output:
 
     root@13df47c66ebc:/home/app/webapp#
 
-Now we are inside the container. We can run the commands for initialize the data.
+Now we are inside of the container. We can run the commands for initialize the data.
 First, let's create, migrate and seed our database:
 
     $ rake db:create
@@ -59,9 +223,8 @@ First, let's create, migrate and seed our database:
 The seed command can take some time, since it's going to insert a lot
 of records into our database container.
 
-Once the seed command finishes, we can index the data using a rake task provided
+Once the seed command finishes, we can index the data by using a rake task provided
 by the `elasticsearch-rails` gem:
-
 
     $ rake environment elasticsearch:import:model CLASS='Article' FORCE='y' BATCH=100
 
@@ -77,7 +240,7 @@ Now we are ready. Go to http://33.33.33.99 and you'll see the application:
 ![Our Application](images/final-app-dev.png)
 
 Let's try the indexer worker that comes with the application in order to test
-our redis connection. Still inside the container, run:
+our Redis connection. Still inside the container, run:
 
     $ bundle exec sidekiq --queue elasticsearch --verbose
 
@@ -113,4 +276,4 @@ Output:
     Dalli::Server#connect 172.17.0.1:11211
     => [true]
 
-This means the connection with the memcached container is also correct.
+This means the connection with the Memcached container is also correct.
