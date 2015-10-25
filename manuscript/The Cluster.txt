@@ -79,7 +79,7 @@ or the name you'd like to use:
 
 For the instances security group, we can use the security group that comes
 with our the default VPC. 
-Now every account should have a default VPC. You use this command for getting
+Now every account should have a default VPC. You can use this command for getting
 your VPCs information:
 
     $ aws ec2 describe-vpcs
@@ -99,7 +99,7 @@ Output:
 	]
     }
 
-Let's get our default VPC id and its security group id and save these to variables
+Let's get our default VPC id and its Security Group Id and save these to variables
 so we can use them later:
 
     $ read GroupId VpcId <<< $(aws ec2 describe-security-groups --group-names default --query "SecurityGroups[*].{GroupId:GroupId,VpcId:VpcId}" --output=text)
@@ -227,7 +227,7 @@ the keys and instance Role that were created previously, one of our subnets and
 the security group for the default VPC.
 
 For getting the available subnets let's use the `describe-subnets` command
-and filter the result by vpc-id using the variable that we saved previously:
+and filter the result by vpc-id using the variable that contains our default VPC id:
 
     $ aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VpcId" --query "Subnets[*].SubnetId"
 
@@ -240,9 +240,8 @@ Output:
 	"subnet-477ea97a"
     ]
 
-I have 4 available subnets. In our case let's just use
-one for all the resources. I'll choose the first one for launching the instances and
-save it in a variable. You can do the same.
+I have 4 available subnets. Let's choose the first one for launching the instances and
+also let's record the id into a variable:
 
     $ SubnetId=`aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VpcId" --query "Subnets[0].SubnetId" --output=text`
 
