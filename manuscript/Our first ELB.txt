@@ -1,10 +1,24 @@
 # Our first ELB
 
-Let's create an ELB for the MySQL container. Remember to change the subnet and the
-security group with your default or custom vpc information. This is going to be an internal ELB
-since we just want to use it inside of our vpc network:
+The way we are going to manage Service Discovery inside ECS is by using Elastic 
+Load Balancers for our resources. As I mentioned before, we can run our tasks
+by using services that run behind an ELB. This ELB will have a static DNS, so we don't
+have to worry if the service runs the task on different instances during 
+deployments.
 
-    $ aws elb create-load-balancer --load-balancer-name mysql-elb --listeners Protocol=TCP,LoadBalancerPort=80,InstanceProtocol=TCP,InstancePort=3306 --subnets subnet-39706b4e --scheme internal --security-groups sg-c70ff2a1
+Let's create an ELB for the MySQL container. For this, will need our subnet and
+security group ids. Remember you can store these values into variables by using:
+
+    $ read GroupId VpcId <<< $(aws ec2 describe-security-groups --group-names default --query "SecurityGroups[*].{GroupId:GroupId,VpcId:VpcId}" --output=text)
+    $ SubnetId=`aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VpcId" --query "Subnets[0].SubnetId" --output=text`
+
+Now you can use `$GroupId`, `$VpcId` and `$SubnetId` inside of the AWS CLI commands.
+This ELB just needs to be reached by our cluster instances, so it can be internal.
+Also, the MySQL container will expose the port 3306, so we can add a listener to that port
+but use the port 80 in our ELB.
+The command for create this ELB is:
+
+    $ aws elb create-load-balancer --load-balancer-name mysql-elb --listeners Protocol=TCP,LoadBalancerPort=80,InstanceProtocol=TCP,InstancePort=3306 --subnets $SubnetId --scheme internal --security-groups $GroupId
 
 Output:
 
@@ -18,5 +32,30 @@ instance running a MySQL container that exposes and binds its port 3306 to the h
 On the other side, the ELB has a listener on its port 80 to the port 3306 of the instance, 
 so if we want to connect to this ELB, remember to always use the port 80.
 
-Finally, hosts outside of the vpc won't be able to connect to this ELB
-since it was launched inside of our vpc using its default security group, 
+Finally, hosts outside of the VPC won't be able to connect to this ELB
+since it was launched inside of our VPC using its default security group.
+
+Now, let's use the Web Console for this.
+Go to the EC2 panel, and in the left sidebar, click on Load Balancers.
+Then click on "Create Load Balancer":
+
+![Create ELB](images/ui/create-elb.png)
+
+Give the ELB a name, choose your default VPC and select the insternal
+load balancer option. Also, add a listener from the port 80 of the ELB, 
+to the port 3306 of the instance and click on "Next: Assign Security Groups":
+
+![ELB Basic Configuration](images/ui/elb-basic-configuration.png)
+
+In the security group configuration, make sure you select the default
+VPC security Group and click next:
+
+![ELB Security Group](images/ui/elb-security-group.png)
+
+Click next until you reach the Review and Create button.
+Verify that all it's correct:
+
+![ELB Review](images/ui/elb-review.png)
+
+And click create.
+
