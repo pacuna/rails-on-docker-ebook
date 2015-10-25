@@ -1,7 +1,7 @@
 # Running the task
 
-Let's run a task using the MySQL task definition just to check if everything's OK. First let's see
-if this task definition is actually on our task definitions list:
+Let's run a task using the MySQL task definition just to check if everything's OK. First, let's see
+if this task definition is actually in our task definitions list:
 
     $ aws ecs list-task-definitions
 
@@ -14,7 +14,7 @@ Output:
     }
 
 Good, so let's run the task.
-You can run a task without a service using the following command:
+You can run a task without a service by using the following command:
 
     $ aws ecs run-task --cluster searchapp --task-definition searchapp-db:1
 
@@ -50,25 +50,22 @@ Output:
     }
 
 The only parameter is the task-definition name, follow by a semicolon and the revision number
-that we want to deploy. Every time you register a new version of this task, the revision number will increment in one.
+that we want to deploy. Every time you register a new version of this task, the revision number will increase in one.
 
-For polling the status of the task, we need its Arn identifier.
-We can get the running tasks with
+For polling the status of the task, we need its Arn identifier. Let's get this Arn
+and save it to a variable:
 
-    $ aws ecs list-tasks --cluster searchapp
+    $ taskARN=`aws ecs list-tasks --family searchapp-db --cluster searchapp --query "taskArns[0]" --output text`
+
+    $ echo $taskARN
 
 Output:
 
-    {
-	"taskArns": [
-	    "arn:aws:ecs:us-east-1:387705308362:task/99f26c75-b7f6-4f3c-a126-0d6b14684160"
-	]
-    }
+    arn:aws:ecs:us-east-1:387705308362:task/29cd4c5f-1707-45e2-8235-e8ab8be124ed
 
-The output contains just the Arn of the task that we launched. We can get
-more information using that Arn:
+Now let's use this Arn for getting more information about this task:
 
-    $ aws ecs describe-tasks --cluster searchapp --tasks arn:aws:ecs:us-east-1:387705308362:task/99f26c75-b7f6-4f3c-a126-0d6b14684160
+    $ aws ecs describe-tasks --cluster searchapp --tasks $taskARN
 
 Output:
 
@@ -110,66 +107,49 @@ Output:
 	]
     }
 
-The output gives us a full report about our tasks. We know that this task is running, so we can assume
-that the docker image was pulled and run correctly. We know the Arn of the
-container Instance in which the task was launched. And we know the task is mapping the
+The output gives us a full report about the task. We know this task is running, so we can assume
+the docker image was pulled and started correctly. We know the ARN of the
+container Instance on which the task was launched. And we know the task is mapping the
 port 3306 of the container, with the port 3306 of the EC2 instance.
 
 Now, how can we know that the MySQL server is ready and waiting for connections?
-Well, all these resources are being launched using the default vpc security group, 
-which means the resources inside the vpc and with that security group assigned, have free traffic between them.
-Let's ssh into our of our instances and see if we can get a connection with the MySQL
+Well, all these resources are being launched using the default VPC security group, 
+meaning the resources inside of the VPC. And with that security group assigned, we have free traffic between them.
+Let's ssh into one of our instances and see if we can get a connection with the MySQL
 server.
+
 We'll try with the same instance that's running the task. 
-Let's get more information about this instance using its Arn:
+Let's get more information about this instance using its ARN.
+First, let's store the ARN of the instance in a variable:
 
-    $ aws ecs describe-container-instances --cluster searchapp --container-instances arn:aws:ecs:us-east-1:387705308362:container-instance/52b56eb8-2657-45cb-8cb3-5fdcd008f162
+    $ instanceARN=`aws ecs describe-tasks --cluster searchapp --tasks $taskARN --query "tasks[0].containerInstanceArn" --output text`
 
-If you inspect the output, you'll find a section that contains the instance id:
+And now use this variable for getting the instance id and save it to another variable:
 
-    "ec2InstanceId": "i-8272af56"
+    $ instanceID=`aws ecs describe-container-instances --cluster searchapp --container-instances $instanceARN --query "containerInstances[0].ec2InstanceId" --output text`
 
-With that id we can get the public ip address of the instance using the ec2 api:
+With that id we can get the public DNS address of the instance using the ec2 api:
 
-    $ aws ec2 describe-instances --instance-ids i-8272af56
+    $ aws ec2 describe-instances --instance-ids $instanceID --query "Reservations[0].Instances[0].PublicDnsName"
 
-    {
-	"Reservations": [
-	    {
-		"OwnerId": "387705308362",
-		"ReservationId": "r-202269dd",
-		"Groups": [],
-		"Instances": [
-		    {
-			"Monitoring": {
-			    "State": "disabled"
-			},
-			"PublicDnsName": "ec2-52-23-203-99.compute-1.amazonaws.com",
-			"State": {
-			    "Code": 16,
-			    "Name": "running"
-			},
-			"EbsOptimized": false,
-			"LaunchTime": "2015-10-10T02:13:50.000Z",
-			"PublicIpAddress": "52.23.203.99",
-			"PrivateIpAddress": "172.31.1.132",
-    ...
+Output:
 
-In my case the public dns of the instance is `ec2-52-23-203-99.compute-1.amazonaws.com`.
-If I try to connect to the MySQL server from my local machine, it's not going to work.
-This is because my ip is not in the vpc range. But we can ssh into the EC2 instance and try from there.
+    "ec2-52-23-203-99.compute-1.amazonaws.com"
 
-In order to connect to the instace via ssh, we have to add a rule to the security group.
-We need access to the port 22.
-Remember to change the group-id with your vpc default security group id
-and the cird ip parameter with your local ip address. With this rule we can connect to the
-instances just from our network. If you want to grant access from anywhere, use 0.0.0.0/0.
+In my case the public DNS of the instance is `ec2-52-23-203-99.compute-1.amazonaws.com`.
+If I try to connect to the MySQL server that's running on that instance from my local machine, it's not going to work.
+This is because my IP is not in the VPC range. But we can ssh into the EC2 instance and try from there.
 
-    $ aws ec2 authorize-security-group-ingress --group-id sg-c70ff2a1 --protocol tcp --port 22 --cidr 190.101.5.80/24
+In order to connect to the instance via SSH, we have to add a rule to the security group that
+allow us to access the port 22.
+We'll add a rule just for our network. This means that you won't be able to connect
+to the instance unless you're in your current network. Replace the cidr parameter
+with your current IP address or with 0.0.0.0/0 if your want to connect from anywhere:
 
+    $ aws ec2 authorize-security-group-ingress --group-id $GroupId --protocol tcp --port 22 --cidr 190.101.5.80/24
 
-Now you should be able to connect to the instance from your network using the correct pem file and login with the
-ec2-user:
+Now you should be able to connect to the instance from your network using the 
+correspondent PEM file and login with the `ec2-user`:
 
     $ ssh -i ~/.ssh/keys/ClusterKeyPair.pem ec2-user@ec2-52-23-203-99.compute-1.amazonaws.com
 
@@ -187,7 +167,7 @@ And you'll ssh into the instance:
     -bash: warning: setlocale: LC_CTYPE: cannot change locale (UTF-8): No such file or directory
     [ec2-user@ip-172-31-1-132 ~]$
 
-Great! Now we are inside of the machine. Let's try listing the running
+Great! We are inside of the machine. Let's try listing the running
 containers:
 
     $ docker ps
@@ -198,8 +178,8 @@ Output:
     fd8e52ad8b34        mysql:5.7                        "/entrypoint.sh mysq   6 minutes ago       Up 6 minutes        0.0.0.0:3306->3306/tcp       ecs-searchapp-db-1-searchapp-db-bc97e9d6f3bff4cba801
     aadddba8536d        amazon/amazon-ecs-agent:latest   "/agent"               13 minutes ago      Up 13 minutes       127.0.0.1:51678->51678/tcp   ecs-agent
 
-So as expected, the MySQL container is running next to the amazon-ecs-agent.
-Let's see if we can connect to MySQL from this machine. For that
+So as expected, the MySQL container is running next to the Amazon ECS agent.
+Let's see if we can connect to MySQL from this machine. For that,
 we first need to install the MySQL client:
 
     $ sudo su
@@ -226,13 +206,13 @@ Output:
 
 Nice! We were able to connect to the MySQL server using the credentials that we
 declared in the MySQL task definition. The other instance registered in the cluster
-also has default vpc security group assigned, so it should be able to connect to this
+also has default VPC security group assigned, so it should be able to connect to this
 MySQL server without problems.
 
 But now we want to run this task using a service scheduler and attach the service
-to a load balancer, so let's stop this task using its Arn:
+to a load balancer, so let's stop this task:
 
-    $ aws ecs stop-task --cluster searchapp --task arn:aws:ecs:us-east-1:387705308362:task/99f26c75-b7f6-4f3c-a126-0d6b14684160
+    $ aws ecs stop-task --cluster searchapp --task $taskARN
 
 Output:
 
@@ -281,6 +261,21 @@ You'll see that there are no more tasks running:
     {
 	"taskArns": []
     }
+
+For running a task using the Web Console, go to the EC2 panel and in the left sidebar
+click on Task Definitions. Select the `searchapp-db` task definitions, and
+in the actions field, select "Run Task":
+
+![Run Task](images/ui/run-task.png)
+
+Then, just click on Run Task:
+
+![Run Task](images/ui/run-task-2.png)
+
+You'll be redirect to the tasks panel where you can check 
+the status of all your tasks running on your cluster.
+
+![Tasks ](images/ui/tasks.png)
 
 In this chapter we run our first task without using a service. This is ideal
 for tasks that need to be run just one time. In the next chapter we'll see a more
