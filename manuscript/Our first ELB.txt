@@ -6,7 +6,7 @@ by using services that run behind an ELB. This ELB will have a static DNS, so we
 have to worry if the service runs the task on different instances during 
 deployments.
 
-Let's create an ELB for the MySQL container. For this, will need our subnet and
+Let's create an ELB for the MySQL container. For this, we'll need our subnet and
 security group ids. Remember you can store these values into variables by using:
 
     $ read GroupId VpcId <<< $(aws ec2 describe-security-groups --group-names default --query "SecurityGroups[*].{GroupId:GroupId,VpcId:VpcId}" --output=text)
@@ -35,13 +35,13 @@ so if we want to connect to this ELB, remember to always use the port 80.
 Finally, hosts outside of the VPC won't be able to connect to this ELB
 since it was launched inside of our VPC using its default security group.
 
-Now, let's use the Web Console for this.
+Now, let's use the Web Console for this same process.
 Go to the EC2 panel, and in the left sidebar, click on Load Balancers.
 Then click on "Create Load Balancer":
 
 ![Create ELB](images/ui/create-elb.png)
 
-Give the ELB a name, choose your default VPC and select the insternal
+Give the ELB a name, choose your default VPC and select the internal
 load balancer option. Also, add a listener from the port 80 of the ELB, 
 to the port 3306 of the instance and click on "Next: Assign Security Groups":
 
