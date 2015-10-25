@@ -99,25 +99,19 @@ Output:
 	]
     }
 
-In order to get the id for your default VPC security
-group, run:
+Let's get our default VPC id and its security group id and save these to variables
+so we can use them later:
 
-    $ aws ec2 describe-security-groups --group-names default --query "SecurityGroups[*].{GroupId:GroupId,VpcId:VpcId}"
+    $ read GroupId VpcId <<< $(aws ec2 describe-security-groups --group-names default --query "SecurityGroups[*].{GroupId:GroupId,VpcId:VpcId}" --output=text)
+
+
+Now if you echo the variables you'll see that we have the information saved:
+
+    $ echo "$GroupId | $VpcId"
 
 Output:
 
-    [
-	{
-	    "VpcId": "vpc-120cd476",
-	    "GroupId": "sg-c70ff2a1"
-	}
-    ]
-
-We are using the query options in the AWS CLI in order to get just
-the information we need.
-
-In my case, the default VPC security group has the id `sg-c70ff2a1` and belongs
-to the VPC with id `vpc-120cd476`. We'll use some of this information during the next steps.
+    sg-c70ff2a1 | vpc-120cd476
 
 This security group by default allows all traffic between resources that belong to the group.
 That's good but we also going to need access to the port 22 for getting
@@ -178,7 +172,7 @@ Output:
 	}
     ]
 
-We just need policy ARN identifier for the native policy for attaching it
+We just need the policy ARN identifier for attaching it
 to our `ecsInstanceRole`:
 
     $ aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role --role-name ecsInstanceRole
@@ -232,75 +226,47 @@ We are going to launch two instances of type `t2.micro` and use
 the keys and instance Role that were created previously, one of our subnets and
 the security group for the default VPC.
 
-For getting the available subnets, run:
+For getting the available subnets let's use the `describe-subnets` command
+and filter the result by vpc-id using the variable that we saved previously:
 
-	$ aws ec2 describe-subnets
+    $ aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VpcId" --query "Subnets[*].SubnetId"
 
 Output:
 
-	{
-	    "Subnets": [
-		{
-		    "VpcId": "vpc-120cd476",
-		    "CidrBlock": "172.31.0.0/20",
-		    "MapPublicIpOnLaunch": true,
-		    "DefaultForAz": true,
-		    "State": "available",
-		    "AvailabilityZone": "us-east-1d",
-		    "SubnetId": "subnet-39706b4e",
-		    "AvailableIpAddressCount": 4091
-		},
-		{
-		    "VpcId": "vpc-120cd476",
-		    "CidrBlock": "172.31.16.0/20",
-		    "MapPublicIpOnLaunch": true,
-		    "DefaultForAz": true,
-		    "State": "available",
-		    "AvailabilityZone": "us-east-1a",
-		    "SubnetId": "subnet-fa724fa3",
-		    "AvailableIpAddressCount": 4091
-		},
-		{
-		    "VpcId": "vpc-120cd476",
-		    "CidrBlock": "172.31.48.0/20",
-		    "MapPublicIpOnLaunch": true,
-		    "DefaultForAz": true,
-		    "State": "available",
-		    "AvailabilityZone": "us-east-1c",
-		    "SubnetId": "subnet-4660426d",
-		    "AvailableIpAddressCount": 4091
-		},
-		{
-		    "VpcId": "vpc-120cd476",
-		    "CidrBlock": "172.31.32.0/20",
-		    "MapPublicIpOnLaunch": true,
-		    "DefaultForAz": true,
-		    "State": "available",
-		    "AvailabilityZone": "us-east-1e",
-		    "SubnetId": "subnet-477ea97a",
-		    "AvailableIpAddressCount": 4091
-		}
-	    ]
-	}
+    [
+	"subnet-39706b4e",
+	"subnet-fa724fa3",
+	"subnet-4660426d",
+	"subnet-477ea97a"
+    ]
 
 I have 4 available subnets. In our case let's just use
-one for all the resources. I'll choose the first one for launching the instances.
+one for all the resources. I'll choose the first one for launching the instances and
+save it in a variable. You can do the same.
 
+    $ SubnetId=`aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VpcId" --query "Subnets[0].SubnetId" --output=text`
 
+    $ echo $SubnetId
+
+Output:
+
+    subnet-39706b4e
+
+Great!. Now, let's talk about *user-data*.
 The user-data parameter allows us to add some initial configuration to the instances.
 In our case, we are passing the configuration for registering the instances
 in our `searchapp` cluster. The `user-data.sh` file contains these two lines:
 
-	#!/bin/bash
-	echo ECS_CLUSTER=searchapp >> /etc/ecs/ecs.config
+    #!/bin/bash
+    echo ECS_CLUSTER=searchapp >> /etc/ecs/ecs.config
 
 You can find this file inside the deploy folder of the source code.
-Now we finally can run the command for launching the instances.
-Remember to replace the security-groups-ids with your default
-VPC security group id, the subnet-id with your subnet-id and the ARN of the instance profile 
-with the one you got before.
 
-	$ aws ec2 run-instances --image-id ami-4fe4852a --count 2 --instance-type t2.micro --key-name ClusterKeyPair --security-group-ids sg-c70ff2a1 --subnet-id subnet-39706b4e  --iam-instance-profile Arn=arn:aws:iam::387705308362:instance-profile/ecsInstanceRole --associate-public-ip-address --user-data file://user-data/user-data.sh
+Now we finally can run the command for launching the instances.
+If you didn't save your security group and subnet ids into variables, remember to replace them
+in the command:
+
+    $ aws ec2 run-instances --image-id ami-4fe4852a --count 2 --instance-type t2.micro --key-name ClusterKeyPair --security-group-ids $GroupId --subnet-id $SubnetId  --iam-instance-profile Name=ecsInstanceRole --associate-public-ip-address --user-data file://user-data/user-data.sh
 
 Output:
 
