@@ -178,7 +178,7 @@ Add:
 
 ![Adding a Volume](images/ui/adding-a-volume.png)
 
-We can left the Source Path field empty so ECS can assign some directory
+We can leave the Source Path field empty so ECS can assign a directory
 for us inside of the instance.
 
 Now click on "Add Container Definition".
