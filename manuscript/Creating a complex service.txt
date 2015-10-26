@@ -1,12 +1,12 @@
 # Creating a complex service
 
-The simple service created in the previous section was enough for catching
-the essentials of the workflow in ECS. You create your task definition,
+The service created in the previous chapter was enough for catching
+the essentials of the workflow in ECS. You have to create a task definition,
 and a service that runs a task that uses that task definition. When you don't 
 need the task to be running anymore, you just update the desired-count of tasks
 for the service to zero, and finally remove the service.
 
-Now, let's create a service connected to the ELB. In this case we are going to
+Now, let's create a service connected to an ELB. In this case we are going to
 need a json file with the definition of the service. This is a good thing since now
 we can add our tasks definitions and our services definitions to our version control system.
 We're also going to need a new IAM Role, since this kind of service requires more interaction
@@ -60,7 +60,7 @@ Now that we have the Role, the json for the service should look like this (deplo
 		"role": "ecsServiceRole"
     }
 
-And we can create the service using this file as an argument for the `create-service` 
+Let's create the service by using this file as an argument for the `create-service` 
 command:
 
     $ aws ecs create-service --cluster searchapp --service-name mysql-service --cli-input-json file://services/mysql-service.json
@@ -111,10 +111,9 @@ Output:
 	}
     }
 
-Wait for a minute and then describe the service using its Arn (obtained using the `list-services` command), 
-we'll get:
+Wait for a minute and then describe the service:
 
-    $ aws ecs describe-services --cluster searchapp --services arn:aws:ecs:us-east-1:387705308362:service/mysql-service
+    $ aws ecs describe-services --cluster searchapp --services mysql-service
 
 
     {
@@ -171,7 +170,7 @@ we'll get:
     }
 
 Now there's an event with the message `(service mysql-service) registered 1 instances in (elb mysql-elb)`
-which means our MySQL service should now be available using the ELB DNS name. 
+which means our MySQL service should now be reachable through the ELB DNS name. 
 Let's get the ELB DNS and then try to connect to the MySQL service from inside
 one of our instances:
 
@@ -237,8 +236,8 @@ Output:
 As you can see from this output, the DNS for this load balancer is `internal-mysql-elb-1700927984.us-east-1.elb.amazonaws.com`
 and it has one instance attached.
 
-Let's connect to the same instance as before but this time let's try using the ELB DNS
-for connecting to the MySQL server. This time using the port 80:
+Let's connect to the same instance we connected before but this time let's try using the ELB DNS
+for the MySQL server. This time we use the port 80:
 
     $ ssh -i ~/.ssh/keys/ClusterKeyPair.pem ec2-user@ec2-52-23-203-99.compute-1.amazonaws.com
 
@@ -271,7 +270,63 @@ for connecting to the MySQL server. This time using the port 80:
 Great! We have our first service in place using our internal load balancer.
 
 For the rest of the tasks, the setup will be pretty similar, we have to register
-the task definitions, create a load balancer for each one, and launch a service
+the task definitions, create a load balancer for each one of the tasks, and launch a service
 attached to that load balancer. Once we have all of our dependencies running
 in their services, we can launch our main application and connect it to those
 services.
+
+For creating the service using the Web Console, first we have to create the Role.
+Go to the IAM Management Console, click on Roles in the left sidebar and click
+on Create New Role:
+
+![Create Service Role](images/ui/create-service-role-1.png)
+
+use the name ecsServiceRole and Click on Next step:
+
+![Create Service Role](images/ui/create-service-role-2.png)
+
+In the Role type, search for "Amazon EC2 Container Service Role" and
+click on Select:
+
+![Create Service Role](images/ui/create-service-role-3.png)
+
+Attach the policy and click on Next Step:
+
+![Create Service Role](images/ui/create-service-role-4.png)
+
+Verify all the information and click on Create Role:
+
+![Create Service Role](images/ui/create-service-role-5.png)
+
+Now that we have the Role for the service we need to run, go to
+the ECS Management Console, click on Task definitions in the left sidebar, 
+select the searchapp-db task definition and in the actions fields select Create 
+Service:
+
+![Create Service](images/ui/create-complex-service-1.png)
+
+Same as before, use mysql-service as a name, 1 for number of tasks
+but this time in the ELB section, select our mysql-elb ELB and
+the ecsServiceRole for the Service Role:
+
+![Create Service](images/ui/create-complex-service-2.png)
+
+And click on Create Service.
+
+Now in your cluster panel, you'll see your service running:
+
+![Services](images/ui/create-complex-service-3.png)
+
+If you click on the link of that service, you'll see a Load Balancer
+section with the information of the ELB attached to this service:
+
+![Service behing ELB](images/ui/create-complex-service-4.png)
+
+
+
+
+
+
+
+
+
