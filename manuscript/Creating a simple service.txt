@@ -47,19 +47,19 @@ Output:
 	}
     }
 
-The create-service command just needs the cluster name, the service name, the
-task definition for running the task with its revision number, and the desired 
+The `create-service` command needs the names of the cluster, service and the
+task definition with its revision number, and the desired 
 number of tasks the service should run. If you choose to run more than one task, 
 the tasks will be allocated in more than one instance, which in our case makes 
-sense, since the task is using a fixed port on the instance (3306), so it's not
-possible to have more than one of this task running on one instance.
+sense, since the task uses a fixed port on the instance (3306), so it's not
+possible to have more than one on one instance.
 
-You can let ECS to pick a random port for your task, but then you would no be
+You can let ECS to pick a random port for your task, but then you wouldn't be
 able to create a service attached to an ELB, since the ELB needs a static port
-for its listener configuration. This is a feature a lot of people are waiting 
+for the listener configuration. This is a feature a lot of people are waiting 
 to be implemented.
 
-If you list your services again, you'll get the Arn for the service that we just created:
+If you list your services again, you'll see the service we just created:
 
     $ aws ecs list-services --cluster searchapp
 
@@ -70,10 +70,10 @@ If you list your services again, you'll get the Arn for the service that we just
     }
 
 You can run the `describe-services` command if you need more information about
-some specific service. The only parameter you need besides the cluster name,
-is the Arn identifier of the service:
+some specific service. The only parameters you need are the names of the cluster
+and the service:
 
-    $ aws ecs describe-services --cluster searchapp --services arn:aws:ecs:us-east-1:387705308362:service/mysql-service
+    $ aws ecs describe-services --cluster searchapp --services mysql-service
 
     {
 	"services": [
@@ -117,15 +117,17 @@ is the Arn identifier of the service:
     }
 
 It's good to be familiarized with this kind of output. Later it's going to be
-very useful for troubleshooting issues related to the service. The events section
-of the output tells us about the current state of the service and can display
+very useful for troubleshooting issues related to the service. 
+The events section of the output tells us about the current state of the service and can display
 possible errors during the launch. We'll talk more about debugging issues in the last
 chapter of the book.
+
 In our case, the service has started and has reached a steady state, which means
-there's no issues.
+there are no issues.
 
 This is the most basic kind of service. Right now we need our service to
 be attached to the MySQL server ELB, so let's remove this test service. 
+
 For removing a service, first we have to update the desired count of tasks to zero:
 
     $ aws ecs update-service --cluster searchapp --service mysql-service --desired-count 0
@@ -225,4 +227,19 @@ Output:
     }
 
 The status of the service has changed to draining, which means that is going
-to disappear from the cluster.
+to be removed from the cluster.
+
+For creating a service using the Web Console, go to the ECS Panel, click on Task
+Definitions in the left sidebar, and in the actions field, select "Create Service":
+
+![Run Service](images/ui/create-service.png)
+
+In the Create Service form, add a name for your service and choose 1 in the
+Number of tasks. Then click on create service:
+
+![Run Service](images/ui/create-service-2.png)
+
+And that's it. If you navigate to your Cluster panel, you'll see
+your service running:
+
+![Services](images/ui/services-running.png)
