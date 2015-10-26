@@ -1,7 +1,7 @@
 # Creating a complex service
 
 The service created in the previous chapter was enough for catching
-the essentials of the workflow in ECS. You have to create a task definition,
+the essentials of the workflow in ECS. You have to create a task definition
 and a service that runs a task that uses that task definition. When you don't 
 need the task to be running anymore, you just update the desired-count of tasks
 for the service to zero, and finally remove the service.
@@ -170,7 +170,7 @@ Wait for a minute and then describe the service:
     }
 
 Now there's an event with the message `(service mysql-service) registered 1 instances in (elb mysql-elb)`
-which means our MySQL service should now be reachable through the ELB DNS name. 
+which means our MySQL service should now be reachable through the ELB DNS. 
 Let's get the ELB DNS and then try to connect to the MySQL service from inside
 one of our instances:
 
