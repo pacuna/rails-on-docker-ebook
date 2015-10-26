@@ -243,3 +243,7 @@ And that's it. If you navigate to your Cluster panel, you'll see
 your service running:
 
 ![Services](images/ui/services-running.png)
+
+For deleting the service, select the service and click on update.
+Update the number of tasks to 0, wait for a minute and the click
+on Delete Service.
