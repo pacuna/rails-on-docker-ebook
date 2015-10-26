@@ -2,9 +2,8 @@
 
 Now that we know our task definition works properly, let's create
 a service for managing the task. 
-This service will be running behind the ELB we created previously.
 
-If you list your current services you'll get an empty array as response:
+If you list your current services you'll get an empty response:
 
     $ aws ecs list-services --cluster searchapp
 
@@ -50,7 +49,7 @@ Output:
 The `create-service` command needs the names of the cluster, service and the
 task definition with its revision number, and the desired 
 number of tasks the service should run. If you choose to run more than one task, 
-the tasks will be allocated in more than one instance, which in our case makes 
+the tasks will be allocated on more than one instance, which in our case makes 
 sense, since the task uses a fixed port on the instance (3306), so it's not
 possible to have more than one on one instance.
 
@@ -245,5 +244,5 @@ your service running:
 ![Services](images/ui/services-running.png)
 
 For deleting the service, select the service and click on update.
-Update the number of tasks to 0, wait for a minute and the click
+Update the number of tasks to 0, wait for a minute and then click
 on Delete Service.
