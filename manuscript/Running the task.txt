@@ -206,7 +206,7 @@ Output:
 
 Nice! We were able to connect to the MySQL server using the credentials that we
 declared in the MySQL task definition. The other instance registered in the cluster
-also has default VPC security group assigned, so it should be able to connect to this
+also has the default VPC security group assigned, so it should be able to connect to this
 MySQL server without problems.
 
 But now we want to run this task using a service scheduler and attach the service
@@ -276,6 +276,8 @@ You'll be redirect to the tasks panel where you can check
 the status of all your tasks running on your cluster.
 
 ![Tasks ](images/ui/tasks.png)
+
+And that's it!
 
 In this chapter we run our first task without using a service. This is ideal
 for tasks that need to be run just one time. In the next chapter we'll see a more
