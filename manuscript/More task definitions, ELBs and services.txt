@@ -1,7 +1,7 @@
 # More task definitions, ELBs and Services
 
 Now that we know the basics of the ECS workflow, let's register the task definitions
-for the remaining dependencies: elasticsearch, redis and memcached. All of these
+for the remaining dependencies: Elasticsearch, Redis and Memcached. All of these
 services need to run behind an ELB so our main application can discover the endpoints
 correctly.
 
@@ -47,7 +47,7 @@ Here we have the task definition for elasticsearch:
     }
 
 Pretty similar to the MySQL task definition. We are using a volume for 
-persisting the elasticsearch data, using 256 MiB for memory, and 128 cpu units.
+persisting the Elasticsearch data, using 256 MiB for memory, and 128 cpu units.
 The port mapping is 9200 from the container to 9200 on the instance.
 Let's register this task in our cluster:
 
@@ -98,10 +98,9 @@ Output:
 	}
     }
 
-Now, before create the service let's add a new ELB for elasticsearch. Remember 
-to use your security group and subnet ids:
+Now, before create the service let's add a new ELB for Elasticsearch:
 
-    $ aws elb create-load-balancer --load-balancer-name elasticsearch-elb --listeners Protocol=TCP,LoadBalancerPort=80,InstanceProtocol=TCP,InstancePort=9200 --subnets subnet-39706b4e --scheme internal --security-groups sg-c70ff2a1
+    $ aws elb create-load-balancer --load-balancer-name elasticsearch-elb --listeners Protocol=TCP,LoadBalancerPort=80,InstanceProtocol=TCP,InstancePort=9200 --subnets $SubnetId --scheme internal --security-groups $GroupId 
 
 Output:
 
@@ -169,8 +168,7 @@ Output:
 	}
     }
 
-If we follow the same procedure as before, that is, get the instance
-where the service is running and try to reach the service, we get:
+If we go to the instance where the task is running and try to reach the service, we get:
 
     [ec2-user@ip-172-31-1-132 ~]$ curl localhost:9200
     {
@@ -191,8 +189,7 @@ Great, so that service is ready.
 
 ## Redis
 
-The task definition for redis is:
-
+The task definition for Redis is:
 
     {
 	"containerDefinitions": [
@@ -222,10 +219,10 @@ The task definition for redis is:
     }
 
 In this case we're not mounting a volume and we are using less memory than the first two.
-The amount of memory and cpu units that you want to use for a task it's probably going to be 
+The amount of memory and CPU units you want to use for a task it's probably going to be 
 the outcome of experimentation with your containers. Sometimes you'll launch a task with a less
 amount than the container really needs and the process will be killed. So keep in mind
-that a typical failure can be produced for using the wrong amount of memory and/our cpu units.
+that a typical failure can be produced for using the wrong amount of memory and/our CPU units.
 
 Let's register this task:
 
@@ -267,7 +264,7 @@ Output:
 
 Create the ELB:
 
-    $ aws elb create-load-balancer --load-balancer-name redis-elb --listeners Protocol=TCP,LoadBalancerPort=80,InstanceProtocol=TCP,InstancePort=6379 --subnets subnet-39706b4e --scheme internal --security-groups sg-c70ff2a1
+    $ aws elb create-load-balancer --load-balancer-name redis-elb --listeners Protocol=TCP,LoadBalancerPort=80,InstanceProtocol=TCP,InstancePort=6379 --subnets $SubnetId --scheme internal --security-groups $GroupId
 
 Output:
 
@@ -275,7 +272,7 @@ Output:
 	"DNSName": "internal-redis-elb-124984907.us-east-1.elb.amazonaws.com"
     }
 
-And use this json for launching the service:
+The json for this service is:
 
 
     {
@@ -336,8 +333,7 @@ Great, we just need one more dependency service.
 
 ## Memcached
 
-The task definition is pretty similar to the redis one:
-
+The task definition is pretty similar to the Redis one:
 
     {
 	"containerDefinitions": [
@@ -406,7 +402,7 @@ Output:
 
 Create the ELB:
 
-    $ aws elb create-load-balancer --load-balancer-name memcached-elb --listeners Protocol=TCP,LoadBalancerPort=80,InstanceProtocol=TCP,InstancePort=11211 --subnets subnet-39706b4e --scheme internal --security-groups sg-c70ff2a1
+    $ aws elb create-load-balancer --load-balancer-name memcached-elb --listeners Protocol=TCP,LoadBalancerPort=80,InstanceProtocol=TCP,InstancePort=11211 --subnets $GroupId --scheme internal --security-groups $GroupId
 
 Output:
 
@@ -414,7 +410,7 @@ Output:
 	"DNSName": "internal-memcached-elb-47598939.us-east-1.elb.amazonaws.com"
     }
 
-Launch a service using this json:
+The json for this service is:
 
     {
 	"serviceName": "memcached-service",
@@ -486,5 +482,5 @@ Output:
 	]
     }
 
-Now we cant start with our Rails application that's going to be connected with each one of these services using their
-respective internal ELBs.
+Now we cant start with our Rails application that's going to be connected with 
+each one of these services by using their respective internal ELBs.
