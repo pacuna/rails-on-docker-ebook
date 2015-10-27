@@ -93,7 +93,7 @@ file for the production environment.
 
 As usual, we need an ELB for accessing our application. Let's create one now:
 
-    $ aws elb create-load-balancer --load-balancer-name searchapp-elb --listeners Protocol=HTTP,LoadBalancerPort=80,InstanceProtocol=HTTP,InstancePort=80 --subnets subnet-39706b4e --security-groups sg-c70ff2a1
+    $ aws elb create-load-balancer --load-balancer-name searchapp-elb --listeners Protocol=HTTP,LoadBalancerPort=80,InstanceProtocol=HTTP,InstancePort=80 --subnets $SubnetId --security-groups $GroupId
 
 Output:
 
@@ -102,9 +102,9 @@ Output:
     }
 
 I have configured an special endpoint that I want the health check for this ELB to use. This is because
-once our application is up, we first need to index all the elasticsearch data. But the ELB
+once our application is up, we first need to index all the Elasticsearch data. But the ELB
 will try to ping the default health check route which is '/' and that's going to return an error (the ELB needs a 200 status code), 
-causing the task to be restarted. So instead we'll use a custom '/healthcheck' route which always
+causing the task to be restarted. So instead of that route, we'll use a custom '/healthcheck' route which always
 responds 200 as long as our application is up and will not return errors for missing indexes.
 
 For configuring the health check endpoint let's run:
@@ -123,14 +123,13 @@ Output:
 	}
     }
 
-Another difference with this ELB is we don't want it to be an internal ELB, since is has to be public
+Another difference with this ELB is we don't want it to be an internal ELB. It has to be public
 so people can access our application, therefore we don't need the internal flag.
 
 We also have to expose the port 80 in our instances and in the ELB. All of these resources are sharing
-the same security group, and the easiest way is to add a new rule for open access to the port 80 on that security group (remember
-to change the security group with the one for your vpc):
+the same security group, and the easiest way is to add a new rule for open access to the port 80 on that security group:
 
-    $ aws ec2 authorize-security-group-ingress --group-id sg-c70ff2a1 --protocol tcp --port 80 --cidr 0.0.0.0/0
+    $ aws ec2 authorize-security-group-ingress --group-id $GroupId --protocol tcp --port 80 --cidr 0.0.0.0/0
 
 The json format for our service application is:
 
@@ -287,7 +286,7 @@ Output:
     ]
 
 
-And then we can describe the instance using the instance id and query for it DNS:
+And then we can describe the instance using the instance id and query for the DNS:
 
     $ aws ec2 describe-instances --instance-ids i-8372af57 --query "Reservations[*].Instances[*].PublicDnsName"
 
@@ -369,14 +368,14 @@ Output:
     Query OK, 1 row affected (0.00 sec)
 
 
-And that's it. Run exit to get back to the container, and now run the seeds:
+And that's it. Type exit to get back to the container, and now run the seeds:
 
     $ RAILS_ENV=production rake db:seed
 
 You'll see a lot of output of the data being inserted into the database. Just wait
 until it finishes.
 
-Once it's ready, we can index the data using the task provided by the `elasticsearch-rails` gem
+Once it's ready, we can index the data by using the task provided by the `elasticsearch-rails` gem
 (you can use this task anytime you change your index or you want to reindex your data):
 
     $ RAILS_ENV=production bundle exec rake environment elasticsearch:import:model CLASS='Article' FORCE='y' BATCH=100
@@ -390,21 +389,21 @@ Now if you visit the web page of the application again, you'll see that this tim
 ![Complete Web Application](images/complete-app.png)
 
 That's great. Right now we're sure that MySQL and Elasticsearch are working correctly.
-But what about redis and memcached? Well, the project comes with a worker ready for use.
-The worker will index the data using Sidekiq every time a record gets modified.
+But what about Redis and Memcached? Well, the project comes with a worker ready for use.
+This worker will index the data using Sidekiq every time a record gets modified.
 
 First let's run the worker:
 
     root@f3831182e38d:/home/app/webapp# RAILS_ENV=production bundle exec sidekiq --queue elasticsearch --verbose
 
-The console will be attached while we have Sidekiq running. We just want to check if the hook with redis is correct:
+The console will be attached while we have Sidekiq running. We just want to check if the hook with Redis is correct:
 
 If you see the first line of the output in the console, you should see something like this:
 
     2015-10-10T19:36:16.169Z 1377 TID-a8c4g INFO: Booting Sidekiq 3.3.4 with redis options {:url=>"redis://internal-redis-elb-124984907.us-east-1.elb.amazonaws.com:80/12"}
 
-Which means that the connection was successful. You can even try opening another session inside the container
-while you have Sidekiq running and modify some article using the rails console. You should see some output
+Which means that the connection was successful. You can try opening another session inside the container
+while you have Sidekiq running and modify some Article using the rails console. You should see some output
 in the Sidekiq window for the record being reindexed.
 
 Let's hit Ctrl-c for exiting Sidekiq and open a rails console:
@@ -418,4 +417,4 @@ And let's clean the cache:
     Dalli::Server#connect internal-memcached-elb-47598939.us-east-1.elb.amazonaws.com:80
     => [true]
 
-You can see the connection with memcached is working properly.
+You can see the connection with memcached is working correctly.
