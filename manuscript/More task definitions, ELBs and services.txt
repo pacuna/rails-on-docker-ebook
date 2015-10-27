@@ -3,7 +3,9 @@
 Now that we know the basics of the ECS workflow, let's register the task definitions
 for the remaining dependencies: Elasticsearch, Redis and Memcached. All of these
 services need to run behind an ELB so our main application can discover the endpoints
-correctly.
+correctly. We are just going to use the AWS CLI for the remaining tasks and services.
+If you prefer to use the Web Console, the process is similar to the one of
+the previous chapter.
 
 ## Elasticsearch
 
