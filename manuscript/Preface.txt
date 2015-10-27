@@ -20,10 +20,9 @@ This is not going to be a useless and non-realistic application, it's going to h
 widely used in big applications out there. We'll connect our application with a MySQL database server, a search engine
 provided by ElasticSearch, Redis and Sidekiq for managing background jobs, and also a cache layer using Memcached.
 
-Since ECS is a new technology and it's constantly changing and improving, I've decided to show all the examples using
-the AWS command line interface. The main reason is that I believe that is more probable the UI from the Web console 
-changes that the Amazon API changes without maintaining backward compatibility. Also, this approach is more useful if you
-decide to automatize part of these processes in the future.
+Since ECS is a new technology and it's constantly changing and improving, I've decided to show all the examples by using
+the AWS Command Line Interface and also the Web Console. Sometimes you'll find one more useful than the other, so it's
+important to master both of them.
 
 
 
