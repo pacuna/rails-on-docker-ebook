@@ -2,7 +2,7 @@
 
 In this chapter we'll see how to run the `searchapp` application locally
 using a virtual machine. We're going to run the main application and all the dependencies
-on different Docker containers. The good thing about this, is we are going to use
+on different Docker containers. The benefit of this approach is that we'll be able to use
 the exactly same images in production, so even though we have to change some minor details, 
 the production environment should work almost out the box.
 
