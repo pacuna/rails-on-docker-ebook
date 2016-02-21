@@ -17,8 +17,8 @@ This file contains the following configuration:
 
     Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
-      config.vm.box     = "vivid"
-      config.vm.box_url = "http://cloud-images.ubuntu.com/vagrant/vivid/current/vivid-server-cloudimg-amd64-vagrant-disk1.box"
+      config.vm.box     = "wily"
+      config.vm.box_url = "https://cloud-images.ubuntu.com/vagrant/wily/current/wily-server-cloudimg-amd64-vagrant-disk1.box"
 
       config.vm.provider :virtualbox do |vb|
 	vb.customize ["modifyvm", :id, "--memory", "2048"]
@@ -26,22 +26,37 @@ This file contains the following configuration:
       end
 
       config.vm.network :private_network, ip: "33.33.33.99"
-      config.vm.network "forwarded_port", guest: 80, host: 80
+      # config.vm.network "forwarded_port", guest: 80, host: 80
 
       config.vm.synced_folder ".", "/vagrant", disabled: true
       config.vm.synced_folder ".", "/code/searchapp", type: 'nfs'
 
       config.vm.provision :shell, :inline => 'apt-get update'
+      config.vm.provision :shell, :inline => 'apt-get install -y apt-transport-https ca-certificates'
+      config.vm.provision :shell, :inline => 'apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D'
+      config.vm.provision :shell, :inline => 'apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 58118E89F3A912897C070ADBF76221572C52609D'
+      config.vm.provision :shell, :inline => 'rm -f /etc/apt/sources.list.d/docker.list'
+      config.vm.provision :shell, :inline => 'touch /etc/apt/sources.list.d/docker.list'
+      config.vm.provision :shell, :inline => 'echo "deb https://apt.dockerproject.org/repo ubuntu-wily main" >> /etc/apt/sources.list.d/docker.list'
+      config.vm.provision :shell, :inline => 'apt-get update'
+      config.vm.provision :shell, :inline => 'apt-get purge lxc-docker'
+      config.vm.provision :shell, :inline => 'apt-cache policy docker-engine'
+      config.vm.provision :shell, :inline => 'apt-get install -y docker-engine'
+      config.vm.provision :shell, :inline => 'service docker start'
+      config.vm.provision :shell, :inline => 'usermod -aG docker vagrant'
+
+      config.vm.provision :shell, :inline => 'curl -L https://github.com/docker/compose/releases/download/1.6.0/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose'
+      config.vm.provision :shell, :inline => 'chmod +x /usr/local/bin/docker-compose'
 
     end
 
 
 If you're not familiarized with the Vagrant DSL, don't worry. You just
-need to know that we are using the Ubuntu Vivid image for our virtual machine,
+need to know that we are using the Ubuntu Wily image for our virtual machine,
 we are using a private IP, and we're mounting a shared folder
 between our host and our guest machine. This way if you want to modify the code
 on your local computer, the changes will be reflected immediately inside of the VM.
-Finally, we are provisioning our machine with a custom shell script in order
+Finally, we are provisioning our machine with a couple of shell commands in order
 to install Docker and Docker Compose during the bootstrap.
 
 The `up` process can take some time since it's going to download
@@ -70,7 +85,7 @@ a MySQL container image that uses a volume from a data-only container:
 
     dbdata:
       image: mysql:5.7
-      name: searchapp-db-data
+      container_name: searchapp-db-data
       environment:
 	- MYSQL_ROOT_PASSWORD=secretpassword
       volumes:
@@ -78,7 +93,7 @@ a MySQL container image that uses a volume from a data-only container:
       command: /bin/true
     db:
       image: mysql:5.7
-      name: searchapp-db
+      container_name: searchapp-db
       environment:
 	- MYSQL_ROOT_PASSWORD=secretpassword
       volumes_from:
@@ -88,7 +103,7 @@ An Elasticsearch container image that mounts a volume for its data directory:
 
     es:
       image: elasticsearch
-      name: searchapp-es
+      container_name: searchapp-es
       volumes:
        - /var/lib/elasticsearch
 
@@ -108,7 +123,7 @@ in the shared folder:
 
     webapp:
       build: .
-      name: searchapp 
+      container_name: searchapp 
       working_dir: /home/app/webapp
       ports:
 	- "80:80"
@@ -197,17 +212,17 @@ Output:
 
 	    Name                       Command               State               Ports
     ---------------------------------------------------------------------------------------------
-    searchapp_db_1          /entrypoint.sh mysqld            Up       3306/tcp
-    searchapp_dbdata_1      /entrypoint.sh /bin/true         Exit 0
-    searchapp_es_1          /docker-entrypoint.sh elas ...   Up       9200/tcp, 9300/tcp
+    searchapp               /sbin/my_init                    Up       443/tcp, 0.0.0.0:80->80/tcp
+    searchapp-db            /entrypoint.sh mysqld            Up       3306/tcp
+    searchapp-db-data       /entrypoint.sh /bin/true         Exit 0
+    searchapp-es            /docker-entrypoint.sh elas ...   Up       9200/tcp, 9300/tcp
     searchapp_memcached_1   /entrypoint.sh memcached         Up       11211/tcp
     searchapp_redis_1       /entrypoint.sh redis-server      Up       6379/tcp
-    searchapp_webapp_1      /sbin/my_init                    Up       443/tcp, 0.0.0.0:80->80/tcp
 
 We can see our application is running and the name that docker-compose gave it
-is `searchapp_webapp_1`. Let's create a bash session inside of the container:
+is `searchapp`. Let's create a bash session inside of the container:
 
-    $ docker exec -it searchapp_webapp_1 bash
+    $ docker exec -it searchapp bash
 
 Output:
 
