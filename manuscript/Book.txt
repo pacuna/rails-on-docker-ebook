@@ -1,11 +1,5 @@
 frontmatter:
-Acknowledgments.txt
-Preface.txt
-mainmatter:
-Requirements.txt
-Setup.txt
-Running the app locally.txt
-Pushing to Dockerhub.txt
+Kube.txt
 The Cluster.txt
 Our first task definition.txt
 Our first ELB.txt
